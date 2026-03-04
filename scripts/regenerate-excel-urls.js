@@ -1,11 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import * as XLSX from "xlsx";
-import ExcelJS from "exceljs";
-import path from "path";
-import { fileURLToPath } from "url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TEMPLATE_PATH = path.join(__dirname, "..", "assets", "templates", "PLANTILLA_INGRESO.xlsx");
 const STORAGE_BUCKET = "onboarding-excels";
 const SIGNED_URL_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 dias
 
@@ -31,11 +26,6 @@ const formatTimestamp = () => {
   const now = new Date();
   const pad = (v) => String(v).padStart(2, "0");
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-};
-
-const setExcelCell = (sheet, cellAddress, value) => {
-  if (value === undefined || value === null || value === "") return;
-  sheet.getCell(cellAddress).value = value;
 };
 
 async function main() {
@@ -69,15 +59,17 @@ async function main() {
   console.log("Turnos:", turnos.length);
   console.log("Planificaciones:", planificaciones.length);
 
+  const empresaRut = normalizeRutForExcel(empresa.rut);
+  const rutKey = sanitizeRut(empresa.rut);
+  const timestamp = formatTimestamp();
+
   // 2. Generar Excel de Usuarios
   console.log("\n--- Generando Excel de Usuarios ---");
-  const headers = [
+  const userHeaders = [
     "identificador", "email", "email alternativo comprobantes",
     "nombre", "apellido", "grupo", "fono1", "fono2", "fono3",
     "identificador razon social", "tipo",
   ];
-
-  const empresaRut = normalizeRutForExcel(empresa.rut);
 
   const adminsRows = admins.map((admin) => [
     normalizeRutForExcel(admin.rut),
@@ -112,56 +104,73 @@ async function main() {
     ];
   });
 
-  const rows = [...adminsRows, ...trabajadoresRows];
-  const sheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheet, "Usuarios");
-
-  const usuariosBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-  console.log("Excel de Usuarios generado:", rows.length, "filas");
+  const allUserRows = [...adminsRows, ...trabajadoresRows];
+  const userSheet = XLSX.utils.aoa_to_sheet([userHeaders, ...allUserRows]);
+  const userWb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(userWb, userSheet, "Usuarios");
+  const usuariosBuffer = XLSX.write(userWb, { type: "buffer", bookType: "xlsx" });
+  console.log("Excel de Usuarios generado:", allUserRows.length, "filas");
 
   // 3. Generar Excel de Planificaciones
   console.log("\n--- Generando Excel de Planificaciones ---");
-  const planWb = new ExcelJS.Workbook();
-  await planWb.xlsx.readFile(TEMPLATE_PATH);
-  const planSheet = planWb.getWorksheet("Trabajadores");
+  const planHeaders = [
+    "Razon Social", empresa.razonSocial || "",
+    "", "Nombre Fantasia", empresa.nombreFantasia || "",
+  ];
+  const planInfoRows = [
+    ["RUT Empresa", empresa.rut || ""],
+    ["Giro", empresa.giro || ""],
+    ["Direccion", empresa.direccion || ""],
+    ["Comuna", empresa.comuna || ""],
+    ["Email Facturacion", empresa.emailFacturacion || ""],
+    ["Telefono", empresa.telefonoContacto || ""],
+    ["Sistema", Array.isArray(empresa.sistema) ? empresa.sistema.join(", ") : empresa.sistema || ""],
+    ["Rubro", empresa.rubro || ""],
+    [],
+    ["--- ADMINISTRADORES ---"],
+  ];
 
-  if (!planSheet) {
-    console.error("No se encontro la hoja 'Trabajadores' en la plantilla.");
-    process.exit(1);
+  admins.forEach((admin, i) => {
+    planInfoRows.push([`Admin ${i + 1}`, [admin.nombre, admin.apellido].filter(Boolean).join(" ")]);
+    planInfoRows.push(["  RUT", admin.rut || ""]);
+    planInfoRows.push(["  Email", admin.email || ""]);
+    planInfoRows.push(["  Telefono", admin.telefono || ""]);
+    planInfoRows.push([]);
+  });
+
+  if (turnos.length > 0) {
+    planInfoRows.push(["--- TURNOS ---"]);
+    turnos.forEach((turno) => {
+      if (turno.id > 0) {
+        planInfoRows.push([`Turno: ${turno.nombre}`, `${turno.horaInicio} - ${turno.horaFin}`, `Colacion: ${turno.colacionMinutos} min`]);
+      }
+    });
+    planInfoRows.push([]);
   }
 
-  setExcelCell(planSheet, "C7", empresa.razonSocial || "");
-  setExcelCell(planSheet, "C8", empresa.nombreFantasia || "");
-  setExcelCell(planSheet, "C9", empresa.rut || "");
-  setExcelCell(planSheet, "C10", empresa.giro || "");
-  setExcelCell(planSheet, "C11", empresa.direccion || "");
-  setExcelCell(planSheet, "C12", empresa.comuna || "");
-  setExcelCell(planSheet, "C13", empresa.emailFacturacion || "");
-  setExcelCell(planSheet, "C14", empresa.telefonoContacto || "");
-  setExcelCell(planSheet, "C15", Array.isArray(empresa.sistema) ? empresa.sistema.join(", ") : empresa.sistema || "");
-  setExcelCell(planSheet, "C16", empresa.rubro || "");
-
-  // Admin data
-  const adminBlockStartRow = 18;
-  for (let i = 0; i < Math.max(admins.length, 1); i++) {
-    const admin = admins[i] || null;
-    const blockStartRow = adminBlockStartRow + i * 6;
-    const adminNombre = admin ? [admin.nombre, admin.apellido].filter(Boolean).join(" ") : "Sin administradores";
-    setExcelCell(planSheet, `B${blockStartRow}`, `Datos Administrador ${i + 1} del Sistema`);
-    setExcelCell(planSheet, `C${blockStartRow + 1}`, adminNombre);
-    setExcelCell(planSheet, `C${blockStartRow + 2}`, admin?.rut || "");
-    setExcelCell(planSheet, `C${blockStartRow + 3}`, admin?.telefono || "");
-    setExcelCell(planSheet, `C${blockStartRow + 4}`, admin?.email || "");
+  if (planificaciones.length > 0) {
+    planInfoRows.push(["--- PLANIFICACIONES ---"]);
+    planificaciones.forEach((p) => {
+      planInfoRows.push([`Planificacion: ${p.nombre}`, `Tipo: ${p.tipo}`, `Dias: ${p.diasTrabajo}`]);
+    });
+    planInfoRows.push([]);
   }
 
-  const planificacionesBuffer = Buffer.from(await planWb.xlsx.writeBuffer());
+  if (asignaciones.length > 0) {
+    planInfoRows.push(["--- ASIGNACIONES ---"]);
+    asignaciones.forEach((a) => {
+      planInfoRows.push([`Grupo: ${a.grupoNombre || ""}`, `Planificacion: ${a.planificacionNombre || ""}`]);
+    });
+  }
+
+  const planSheet = XLSX.utils.aoa_to_sheet(planInfoRows);
+  const planWb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(planWb, planSheet, "Planificaciones");
+  const planificacionesBuffer = XLSX.write(planWb, { type: "buffer", bookType: "xlsx" });
   console.log("Excel de Planificaciones generado");
 
   // 4. Subir a Supabase Storage
   console.log("\n--- Subiendo a Supabase Storage ---");
-  const rutKey = sanitizeRut(empresa.rut);
-  const timestamp = formatTimestamp();
   const usuariosFilename = `usuarios-${rutKey}-${timestamp}.xlsx`;
   const planificacionesFilename = `planificaciones-${rutKey}-${timestamp}.xlsx`;
   const usuariosPath = `onboarding/${rutKey}/${usuariosFilename}`;
@@ -223,38 +232,11 @@ async function main() {
   if (updateError) {
     console.error("Error actualizando registro:", updateError);
   } else {
-    console.log("Registro actualizado correctamente");
-  }
-
-  // 7. Insertar en onboarding_excels
-  const excelRows = [
-    {
-      onboarding_id: ONBOARDING_ID,
-      empresa_rut: empresa.rut || null,
-      tipo: "usuarios",
-      filename: usuariosFilename,
-      url: urlUsuarios,
-      expires_at: expiresAt,
-    },
-    {
-      onboarding_id: ONBOARDING_ID,
-      empresa_rut: empresa.rut || null,
-      tipo: "planificaciones",
-      filename: planificacionesFilename,
-      url: urlPlanificaciones,
-      expires_at: expiresAt,
-    },
-  ];
-
-  const { error: insertError } = await supabase.from("onboarding_excels").insert(excelRows);
-  if (insertError) {
-    console.error("Error insertando en onboarding_excels:", insertError);
-  } else {
-    console.log("Registros insertados en onboarding_excels");
+    console.log("Registro actualizado correctamente en BD");
   }
 
   console.log("\n=== PROCESO COMPLETADO ===");
-  console.log("Expiran:", expiresAt);
+  console.log("URLs validas hasta:", expiresAt);
 }
 
 main().catch(console.error);
