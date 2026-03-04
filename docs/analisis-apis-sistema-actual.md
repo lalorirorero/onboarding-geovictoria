@@ -14,7 +14,7 @@
 **Función:** Genera un token encriptado con datos prellenados de la empresa
 
 **Input:**
-```json
+\`\`\`json
 {
   "id_zoho": "string",
   "empresa": {
@@ -30,16 +30,16 @@
   "planificaciones": [],
   "asignaciones": []
 }
-```
+\`\`\`
 
 **Output:**
-```json
+\`\`\`json
 {
   "success": true,
   "link": "https://ejemplo.com?token=XXXXX",
   "token": "XXXXX"
 }
-```
+\`\`\`
 
 **Proceso actual:**
 1. Recibe datos completos del CRM (empresa + arrays opcionales)
@@ -58,14 +58,14 @@
 **Función:** Desencripta un token y devuelve los datos de la empresa
 
 **Input:**
-```json
+\`\`\`json
 {
   "token": "string"
 }
-```
+\`\`\`
 
 **Output:**
-```json
+\`\`\`json
 {
   "success": true,
   "empresaData": {
@@ -74,7 +74,7 @@
     // ... todos los datos que estaban en el token
   }
 }
-```
+\`\`\`
 
 **Proceso actual:**
 1. Recibe token con TODOS los datos encriptados
@@ -92,7 +92,7 @@
 **Función:** Envía datos finales a Zoho Flow y genera Excel
 
 **Input:**
-```typescript
+\`\`\`typescript
 {
   accion: "progreso" | "completado",
   eventType: "progress" | "complete",
@@ -101,15 +101,15 @@
   metadata: {...},
   excelFile: null
 }
-```
+\`\`\`
 
 **Output:**
-```json
+\`\`\`json
 {
   "success": true,
   "data": "respuesta de Zoho"
 }
-```
+\`\`\`
 
 **Proceso actual:**
 1. Recibe payload con formData completo
@@ -182,7 +182,7 @@
 - Las funciones `encryptToken` y `decryptToken` cambiarán el tipo de datos que manejan
 
 **Solución:**
-```typescript
+\`\`\`typescript
 // ANTES (actual)
 const dataToEncrypt = { /* todos los datos */ }
 const token = await encryptToken(dataToEncrypt)
@@ -190,7 +190,7 @@ const token = await encryptToken(dataToEncrypt)
 // DESPUÉS (nuevo)
 const { data: onboarding } = await supabase.from('onboardings').insert({...})
 const token = await encryptToken({ id: onboarding.id }) // Solo el ID
-```
+\`\`\`
 
 ---
 
@@ -204,7 +204,7 @@ const token = await encryptToken({ id: onboarding.id }) // Solo el ID
 - Con el nuevo sistema, debe hacer: desencriptar → obtener ID → consultar `/api/onboarding/[id]`
 
 **Solución:**
-```typescript
+\`\`\`typescript
 // ANTES (actual - en frontend)
 const response = await fetch('/api/decrypt-token', { body: { token } })
 const { empresaData } = await response.json()
@@ -215,7 +215,7 @@ const decrypted = await decryptToken(token) // { id: "uuid" }
 const response = await fetch(`/api/onboarding/${decrypted.id}`)
 const { data } = await response.json()
 loadDataFromPrefill(data)
-```
+\`\`\`
 
 ---
 
@@ -262,7 +262,7 @@ loadDataFromPrefill(data)
 
 ### 4.1. Detección de tipo de token en el frontend
 
-```typescript
+\`\`\`typescript
 // En components/onboarding-turnos.tsx
 useEffect(() => {
   const initializeData = async () => {
@@ -290,11 +290,11 @@ useEffect(() => {
   
   initializeData()
 }, [])
-```
+\`\`\`
 
 ### 4.2. Modificación de /api/generate-link con compatibilidad
 
-```typescript
+\`\`\`typescript
 // app/api/generate-link/route.ts
 export async function POST(request: NextRequest) {
   const body = await request.json()
@@ -321,7 +321,7 @@ export async function POST(request: NextRequest) {
   
   return NextResponse.json({ success: true, link, token })
 }
-```
+\`\`\`
 
 ---
 

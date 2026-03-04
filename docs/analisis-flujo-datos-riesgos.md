@@ -9,7 +9,7 @@
 
 ### 1.1 Componentes del Sistema
 
-```
+\`\`\`
 ┌─────────────────────────────────────────────────────────────┐
 │                     CRM (ZOHO)                               │
 │  - Genera datos de empresa                                   │
@@ -65,7 +65,7 @@
 │  2. Genera Excel desde formData                              │
 │  3. Envía webhook a Zoho Flow                                │
 └─────────────────────────────────────────────────────────────┘
-```
+\`\`\`
 
 ---
 
@@ -76,7 +76,7 @@
 **API:** `POST /api/generate-link`
 
 **Input desde CRM:**
-```json
+\`\`\`json
 {
   "id_zoho": "123456789",
   "empresa": {
@@ -92,13 +92,13 @@
     "rubro": "Retail"
   }
 }
-```
+\`\`\`
 
 **Proceso:**
 1. Valida que exista campo `empresa`
 2. Extrae `id_zoho` y lo convierte a string
 3. Construye objeto `dataToEncrypt` con estructura completa:
-   ```json
+   \`\`\`json
    {
      "id_zoho": "123456789",
      "razonSocial": "Empresa X S.A.",
@@ -111,19 +111,19 @@
      "planificaciones": [], // Vacío
      "asignaciones": []     // Vacío
    }
-   ```
+   \`\`\`
 4. Encripta TODO el objeto con AES-GCM-256
 5. Genera token base64 URL-safe
 6. Devuelve link: `https://app.com?token=XXXXXXXXXXXX`
 
 **Output:**
-```json
+\`\`\`json
 {
   "success": true,
   "link": "https://app.com?token=XXXXXXXXXXXX",
   "token": "XXXXXXXXXXXX"
 }
-```
+\`\`\`
 
 **⚠️ PROBLEMA ACTUAL:**
 - Token contiene TODOS los datos encriptados (puede ser muy grande)
@@ -138,7 +138,7 @@
 
 **Proceso en `useEffect` inicial:**
 
-```typescript
+\`\`\`typescript
 useEffect(() => {
   const initializeData = async () => {
     const urlParams = new URLSearchParams(window.location.search)
@@ -165,11 +165,11 @@ useEffect(() => {
   
   initializeData()
 }, [])
-```
+\`\`\`
 
 **Función `fetchTokenData(token)`:**
 
-```typescript
+\`\`\`typescript
 const fetchTokenData = async (token: string) => {
   // 1. Llamar a API decrypt-token
   const response = await fetch("/api/decrypt-token", {
@@ -199,7 +199,7 @@ const fetchTokenData = async (token: string) => {
     asignaciones: result.empresaData.asignaciones || []
   }
 }
-```
+\`\`\`
 
 **API:** `POST /api/decrypt-token`
 
@@ -210,7 +210,7 @@ const fetchTokenData = async (token: string) => {
 4. Devuelve `empresaData`
 
 **Estado después de carga:**
-```typescript
+\`\`\`typescript
 formData = {
   empresa: {
     razonSocial: "Empresa X S.A.",  // ← Prellenado
@@ -231,7 +231,7 @@ hasToken = true
 idZoho = "123456789"
 currentStep = 0
 prefilledFields = Set(['empresa.razonSocial', 'empresa.rut', ...])
-```
+\`\`\`
 
 **⚠️ RIESGO IDENTIFICADO #1:**
 - Todos los datos viven SOLO en memoria (useState)
@@ -248,7 +248,7 @@ prefilledFields = Set(['empresa.razonSocial', 'empresa.rut', ...])
 **Función:** `handleNext()`
 
 **Proceso:**
-```typescript
+\`\`\`typescript
 const handleNext = useCallback(() => {
   // 1. Limpiar errores previos
   setFieldErrors({})
@@ -294,7 +294,7 @@ const handleNext = useCallback(() => {
   
   window.scrollTo({ top: 0, behavior: "smooth" })
 }, [currentStep, formData, idZoho, ...])
-```
+\`\`\`
 
 **⚠️ RIESGO IDENTIFICADO #2:**
 - `sendProgressWebhook()` usa `formData` de las dependencias del callback
@@ -302,14 +302,14 @@ const handleNext = useCallback(() => {
 - Puede enviar `admins: []` cuando ya se agregó un admin
 
 **Estado de formData capturado:**
-```typescript
+\`\`\`typescript
 // Si callback se creó cuando formData.admins = []
 // Pero ahora formData.admins = [admin1]
 // El callback TODAVÍA tiene admins = [] en su closure
 sendProgressWebhook({ 
   formData: { admins: [] }  // ← DATOS VIEJOS
 })
-```
+\`\`\`
 
 ---
 
@@ -318,7 +318,7 @@ sendProgressWebhook({
 **Función:** `handlePrev()`
 
 **Proceso:**
-```typescript
+\`\`\`typescript
 const handlePrev = useCallback(() => {
   const prevStep = currentStep - 1
   
@@ -337,14 +337,14 @@ const handlePrev = useCallback(() => {
     setCurrentStep(prevStep)
   }
 }, [currentStep, formData.empresa, idZoho, ...])
-```
+\`\`\`
 
 **⚠️ RIESGO IDENTIFICADO #3:**
 - Mismo problema: `formData` puede estar desactualizado en el closure
 - Si usuario agregó admin en paso 3 y retrocede, webhook puede enviar `admins: []`
 
 **Problema de navegación con saltos:**
-```
+\`\`\`
 Flujo del usuario:
 Paso 0 → 1 → 2 → 3 → 4 (elige "En capacitación") → Paso 6
 
@@ -353,7 +353,7 @@ handlePrev() calcula: prevStep = 6 - 1 = 5
 Usuario va a paso 5 (TrabajadoresStep) ❌
 
 PROBLEMA: Usuario NUNCA vio el paso 5, debería volver al paso 4
-```
+\`\`\`
 
 ---
 
@@ -362,7 +362,7 @@ PROBLEMA: Usuario NUNCA vio el paso 5, debería volver al paso 4
 **Función:** `handleWorkersDecision(decision)`
 
 **Proceso:**
-```typescript
+\`\`\`typescript
 const handleWorkersDecision = useCallback((decision: "now" | "later") => {
   // 1. Actualizar formData
   setFormData(prev => ({ ...prev, loadWorkersNow: decision === "now" }))
@@ -376,7 +376,7 @@ const handleWorkersDecision = useCallback((decision: "now" | "later") => {
     setCompletedSteps(prev => [...new Set([...prev, currentStep])])
   }
 }, [handleNext, setCurrentStep, currentStep])
-```
+\`\`\`
 
 **Flujo:**
 - Usuario en paso 4
@@ -396,7 +396,7 @@ const handleWorkersDecision = useCallback((decision: "now" | "later") => {
 **Función:** `handleConfigurationDecision(decision)`
 
 **Proceso:**
-```typescript
+\`\`\`typescript
 const handleConfigurationDecision = useCallback((decision: "now" | "later") => {
   // 1. Actualizar formData
   setFormData(prev => ({ ...prev, configureNow: decision === "now" }))
@@ -410,7 +410,7 @@ const handleConfigurationDecision = useCallback((decision: "now" | "later") => {
     setCompletedSteps(prev => [...new Set([...prev, currentStep])])
   }
 }, [handleNext, setCurrentStep, currentStep])
-```
+\`\`\`
 
 **Flujo:**
 - Usuario en paso 6
@@ -434,7 +434,7 @@ const handleConfigurationDecision = useCallback((decision: "now" | "later") => {
 - Al retroceder paso (`handlePrev`)
 
 **Proceso:**
-```typescript
+\`\`\`typescript
 export async function sendProgressWebhook(params) {
   console.log("[v0] sendProgressWebhook: INICIO", params)
   
@@ -501,7 +501,7 @@ export async function sendProgressWebhook(params) {
     // NO se lanza error, es fire-and-forget
   }
 }
-```
+\`\`\`
 
 **⚠️ RIESGO IDENTIFICADO #6:**
 - Webhook de progreso NO envía el `formData` actual del usuario
@@ -510,7 +510,7 @@ export async function sendProgressWebhook(params) {
 - No puede ver el progreso real del usuario
 
 **Ejemplo:**
-```
+\`\`\`
 Usuario completa empresa (paso 2) y avanza a paso 3
 Webhook enviado:
 {
@@ -524,7 +524,7 @@ Webhook enviado:
     "porcentajeProgreso": 20
   }
 }
-```
+\`\`\`
 
 ---
 
@@ -535,7 +535,7 @@ Webhook enviado:
 **Trigger:** Usuario hace clic en "Confirmar y Enviar" (paso 10)
 
 **Proceso:**
-```typescript
+\`\`\`typescript
 const handleFinalizar = useCallback(async () => {
   setIsSubmitting(true)
   
@@ -597,7 +597,7 @@ const handleFinalizar = useCallback(async () => {
     // NO bloquea, usuario ya está en página de agradecimiento
   }
 }, [formData, idZoho, steps.length])
-```
+\`\`\`
 
 **⚠️ RIESGO IDENTIFICADO #7:**
 - `handleFinalizar` usa `formData` del closure del callback
@@ -605,7 +605,7 @@ const handleFinalizar = useCallback(async () => {
 - Usuario puede ver página de agradecimiento pero datos incompletos se enviaron
 
 **Ejemplo:**
-```
+\`\`\`
 Usuario agrega admin en paso 3 → formData.admins = [admin1]
 Callback handleFinalizar se crea con formData.admins = [admin1]
 
@@ -614,7 +614,7 @@ Callback handleFinalizar TODAVÍA tiene formData.admins = [admin1]
 
 Usuario hace clic en "Finalizar"
 Se envía: formData.admins = [admin1]  // ← DATOS VIEJOS
-```
+\`\`\`
 
 ---
 
@@ -623,7 +623,7 @@ Se envía: formData.admins = [admin1]  // ← DATOS VIEJOS
 **API:** `POST /api/submit-to-zoho`
 
 **Proceso:**
-```typescript
+\`\`\`typescript
 export async function POST(request: NextRequest) {
   try {
     const payload: ZohoPayload = await request.json()
@@ -675,7 +675,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: ... }, { status: 500 })
   }
 }
-```
+\`\`\`
 
 **⚠️ RIESGO IDENTIFICADO #8:**
 - Excel solo se genera para `eventType === "complete"`
@@ -726,25 +726,25 @@ export async function POST(request: NextRequest) {
 ### 4.1 Cambios Fundamentales
 
 **ANTES (Actual):**
-```
+\`\`\`
 Token → Todos los datos encriptados
 Usuario → Lee datos del token una vez
 Datos → Solo en memoria (useState)
 Cierra navegador → PIERDE TODO
-```
+\`\`\`
 
 **DESPUÉS (Con persistencia):**
-```
+\`\`\`
 Token → Solo UUID del registro
 Usuario → Lee datos de BD
 Datos → En BD (Supabase)
 Auto-save → Cada 5 segundos
 Cierra navegador → Datos persisten
-```
+\`\`\`
 
 ### 4.2 Nueva Arquitectura
 
-```
+\`\`\`
 ┌─────────────────────────────────────────────────────────────┐
 │                     CRM (ZOHO)                               │
 └─────────────────────┬───────────────────────────────────────┘
@@ -789,7 +789,7 @@ Cierra navegador → Datos persisten
 │     datos_actuales = { formData, navigationHistory }        │
 │  2. Merge inteligente (NO sobrescribir datos conocidos)     │
 └─────────────────────────────────────────────────────────────┘
-```
+\`\`\`
 
 ### 4.3 Solución a Cada Riesgo
 
@@ -830,7 +830,7 @@ Cierra navegador → Datos persisten
 ### 5.2 Ejemplos Prácticos
 
 **❌ MAL - Sobrescribir datos con vacíos:**
-```typescript
+\`\`\`typescript
 // BD tiene: admins = [admin1]
 // Frontend envía: admins = [] (por useState desactualizado)
 
@@ -838,10 +838,10 @@ Cierra navegador → Datos persisten
 UPDATE onboardings SET datos_actuales = {
   formData: { admins: [] }  // ← BORRA admin1 ❌
 }
-```
+\`\`\`
 
 **✅ BIEN - Merge inteligente:**
-```typescript
+\`\`\`typescript
 // BD tiene: admins = [admin1]
 // Frontend envía: admins = [] (dato desconocido)
 
@@ -857,10 +857,10 @@ const merged = {
 }
 
 UPDATE onboardings SET datos_actuales = merged
-```
+\`\`\`
 
 **✅ BIEN - Frontend envía siempre estado completo:**
-```typescript
+\`\`\`typescript
 // Usar formDataRef para tener siempre el estado actual
 const formDataRef = useRef(formData)
 useEffect(() => {
@@ -873,7 +873,7 @@ await fetch('/api/onboarding/uuid', {
     formData: formDataRef.current  // ← Siempre actualizado
   })
 })
-```
+\`\`\`
 
 ---
 

@@ -7,34 +7,34 @@
 ### Qué significa:
 
 ✅ **PERMITIDO:**
-```json
+\`\`\`json
 BD tiene:     { "empresa": { "razonSocial": "Empresa X", "rut": "12345678-9" } }
 Frontend envía: { "empresa": { "razonSocial": "Empresa Y", "rut": "12345678-9" } }
 Resultado:    { "empresa": { "razonSocial": "Empresa Y", "rut": "12345678-9" } }
 // ✓ razonSocial cambió de X a Y (dato conocido diferente)
-```
+\`\`\`
 
 ❌ **NO PERMITIDO:**
-```json
+\`\`\`json
 BD tiene:     { "admins": [{ "nombre": "Juan", "rut": "12345678-9" }] }
 Frontend envía: { "admins": [] }
 Resultado:    { "admins": [{ "nombre": "Juan", "rut": "12345678-9" }] }
 // ✓ NO sobrescribe porque el array vacío es "desconocido/sin datos"
-```
+\`\`\`
 
 ❌ **NO PERMITIDO:**
-```json
+\`\`\`json
 BD tiene:     { "empresa": { "razonSocial": "Empresa X", "rut": "12345678-9", "giro": "Servicios" } }
 Frontend envía: { "empresa": { "razonSocial": "Empresa Y" } }  // Falta rut y giro
 Resultado:    { "empresa": { "razonSocial": "Empresa Y", "rut": "12345678-9", "giro": "Servicios" } }
 // ✓ Merge inteligente: actualiza razonSocial, mantiene rut y giro
-```
+\`\`\`
 
 ### Implementación:
 
 **Backend debe implementar lógica de MERGE INTELIGENTE:**
 
-```typescript
+\`\`\`typescript
 function mergeFormData(existingData: OnboardingFormData, newData: Partial<OnboardingFormData>): OnboardingFormData {
   const merged = { ...existingData }
   
@@ -69,11 +69,11 @@ function mergeFormData(existingData: OnboardingFormData, newData: Partial<Onboar
   
   return merged
 }
-```
+\`\`\`
 
 **Frontend debe siempre enviar el estado COMPLETO actual:**
 
-```typescript
+\`\`\`typescript
 // ❌ MAL: enviar solo cambios parciales
 await fetch('/api/onboarding/id', {
   body: JSON.stringify({
@@ -87,7 +87,7 @@ await fetch('/api/onboarding/id', {
     formData: formData  // Estado completo actual del frontend
   })
 })
-```
+\`\`\`
 
 ---
 
@@ -167,19 +167,19 @@ Actualmente el sistema funciona con tokenización:
 - Botón "Atrás" debe seguir el flujo real
 
 **Ejemplo de historial:**
-```
+\`\`\`
 Usuario hace: 0 → 1 → 2 → 3 → 4 → 6 (saltó 5) → 10 (saltó 7,8,9)
 navigationHistory: [0, 1, 2, 3, 4, 6, 10]
 
 "Atrás" desde paso 10 → debe ir a paso 6 (NO a paso 9)
 "Atrás" desde paso 6 → debe ir a paso 4 (NO a paso 5)
-```
+\`\`\`
 
 ---
 
 ## ESTRUCTURA EXACTA DEL FORMDATA (NO MODIFICAR)
 
-```typescript
+\`\`\`typescript
 type OnboardingFormData = {
   empresa: {
     razonSocial: string
@@ -242,7 +242,7 @@ type OnboardingFormData = {
   configureNow: boolean // true = configurar turnos ahora, false = después
   loadWorkersNow: boolean // true = cargar trabajadores ahora, false = en capacitación
 }
-```
+\`\`\`
 
 ---
 
@@ -305,7 +305,7 @@ type OnboardingFormData = {
 
 ### 1. BASE DE DATOS (Supabase)
 
-```sql
+\`\`\`sql
 CREATE TABLE onboardings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   id_zoho TEXT NOT NULL,
@@ -321,7 +321,7 @@ CREATE TABLE onboardings (
   INDEX idx_estado (estado),
   INDEX idx_fecha_actualizacion (fecha_ultima_actualizacion)
 );
-```
+\`\`\`
 
 **Cambios vs sistema anterior:**
 - ❌ ELIMINADO: `datos_iniciales` (no es necesario)
@@ -330,7 +330,7 @@ CREATE TABLE onboardings (
 
 ### 2. ESTRUCTURA DE datos_actuales EN BD
 
-```typescript
+\`\`\`typescript
 {
   empresa: {
     razonSocial: string | "",
@@ -346,27 +346,27 @@ CREATE TABLE onboardings (
   configureNow: boolean,
   loadWorkersNow: boolean
 }
-```
+\`\`\`
 
 **Punto clave:** La estructura es SIEMPRE la misma, aunque los arrays estén vacíos o los strings en blanco.
 
 ### 3. TOKEN SIMPLE COMO UUID
 
 **ANTES:**
-```typescript
+\`\`\`typescript
 // Token contenía esto:
 const token = encryptToken({
   empresa: {...}, // Todos los datos
   admins: [...],
   // etc
 })
-```
+\`\`\`
 
 **AHORA:**
-```typescript
+\`\`\`typescript
 // Token solo contiene el ID:
 const token = onboarding.id // UUID simple: "550e8400-e29b-41d4-a716-446655440000"
-```
+\`\`\`
 
 **Encriptación opcional:**
 - Si quieres ofuscar el UUID, puedes usar una función simple
@@ -382,7 +382,7 @@ const token = onboarding.id // UUID simple: "550e8400-e29b-41d4-a716-44665544000
 
 #### NUEVA: GET /api/onboarding/[id]/route.ts
 
-```typescript
+\`\`\`typescript
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -426,11 +426,11 @@ export async function GET(
     )
   }
 }
-```
+\`\`\`
 
 #### NUEVA: PATCH /api/onboarding/[id]/route.ts
 
-```typescript
+\`\`\`typescript
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -502,11 +502,11 @@ export async function PATCH(
     )
   }
 }
-```
+\`\`\`
 
 #### MODIFICAR: POST /api/generate-link/route.ts
 
-```typescript
+\`\`\`typescript
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -582,7 +582,7 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-```
+\`\`\`
 
 ---
 
@@ -590,14 +590,14 @@ export async function POST(request: NextRequest) {
 
 #### A) useState para onboardingId y navigationHistory
 
-```typescript
+\`\`\`typescript
 const [onboardingId, setOnboardingId] = useState<string | null>(null)
 const [navigationHistory, setNavigationHistory] = useState<number[]>([0])
-```
+\`\`\`
 
 #### B) Modificar useEffect de inicialización
 
-```typescript
+\`\`\`typescript
 useEffect(() => {
   const initializeData = async () => {
     const urlParams = new URLSearchParams(window.location.search)
@@ -631,11 +631,11 @@ useEffect(() => {
   
   initializeData()
 }, [])
-```
+\`\`\`
 
 #### C) Modificar handleNext - Guardar DESPUÉS de validación
 
-```typescript
+\`\`\`typescript
 const handleNext = useCallback(async () => {
   // PASO 1: Validaciones existentes (OBLIGATORIAS)
   if (currentStep === 2) {
@@ -689,11 +689,11 @@ const handleNext = useCallback(async () => {
   setCompletedSteps(prev => [...new Set([...prev, currentStep])])
   
 }, [onboardingId, formData, navigationHistory, currentStep, ...])
-```
+\`\`\`
 
 #### D) Modificar handlePrev - Solo navegar (NO guardar)
 
-```typescript
+\`\`\`typescript
 const handlePrev = useCallback(async () => {
   if (navigationHistory.length <= 1) return // No hay dónde volver
   
@@ -708,7 +708,7 @@ const handlePrev = useCallback(async () => {
   console.log('[v0] Navegando atrás a paso', previousStep, '(sin guardar)')
   
 }, [navigationHistory])
-```
+\`\`\`
 
 **JUSTIFICACIÓN:**
 - Los datos ya se guardaron cuando el usuario presionó "Siguiente" en ese paso
@@ -717,7 +717,7 @@ const handlePrev = useCallback(async () => {
 
 #### E) Modificar handleWorkersDecision - Guardar inmediatamente
 
-```typescript
+\`\`\`typescript
 const handleWorkersDecision = useCallback(async (loadNow: boolean) => {
   const updatedFormData = { ...formData, loadWorkersNow: loadNow }
   setFormData(updatedFormData)
@@ -748,11 +748,11 @@ const handleWorkersDecision = useCallback(async (loadNow: boolean) => {
   setNavigationHistory(prev => [...prev, nextStep])
   
 }, [onboardingId, formData, navigationHistory])
-```
+\`\`\`
 
 #### F) Modificar handleConfigurationDecision - Guardar inmediatamente
 
-```typescript
+\`\`\`typescript
 const handleConfigurationDecision = useCallback(async (configureNow: boolean) => {
   const updatedFormData = { ...formData, configureNow }
   setFormData(updatedFormData)
@@ -783,11 +783,11 @@ const handleConfigurationDecision = useCallback(async (configureNow: boolean) =>
   setNavigationHistory(prev => [...prev, nextStep])
   
 }, [onboardingId, formData, navigationHistory])
-```
+\`\`\`
 
 #### G) Modificar handleFinalizar
 
-```typescript
+\`\`\`typescript
 const handleFinalizar = useCallback(async () => {
   // PASO 1: Marcar como completado en BD
   if (onboardingId) {
@@ -841,7 +841,7 @@ const handleFinalizar = useCallback(async () => {
   setNavigationHistory(prev => [...prev, 11])
   
 }, [onboardingId, formData, navigationHistory, idZoho])
-```
+\`\`\`
 
 ---
 

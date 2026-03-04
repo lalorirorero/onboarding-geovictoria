@@ -14,7 +14,7 @@ Esto significa:
 
 ## ESTRUCTURA BASE (SIEMPRE IGUAL)
 
-```json
+\`\`\`json
 {
   "formData": {
     "empresa": {
@@ -42,7 +42,7 @@ Esto significa:
   "navigationHistory": [0],
   "currentStep": 0
 }
-```
+\`\`\`
 
 ---
 
@@ -53,7 +53,7 @@ Esto significa:
 **Endpoint:** `POST /api/generate-link`
 
 **JSON guardado en BD:**
-```json
+\`\`\`json
 {
   "formData": {
     "empresa": {
@@ -81,7 +81,7 @@ Esto significa:
   "navigationHistory": [0],
   "currentStep": 0
 }
-```
+\`\`\`
 
 ---
 
@@ -90,7 +90,7 @@ Esto significa:
 **Endpoint:** `GET /api/onboarding/[id]`
 
 **Respuesta:**
-```json
+\`\`\`json
 {
   "success": true,
   "data": {
@@ -114,7 +114,7 @@ Esto significa:
   "navigationHistory": [0],
   "lastStep": 0
 }
-```
+\`\`\`
 
 ---
 
@@ -123,7 +123,7 @@ Esto significa:
 **Endpoint:** `PATCH /api/onboarding/[id]`
 
 **Body enviado desde frontend:**
-```json
+\`\`\`json
 {
   "formData": {
     "empresa": {
@@ -157,16 +157,16 @@ Esto significa:
   "navigationHistory": [0, 1, 2, 3],  // ← ACTUALIZADO
   "currentStep": 3                     // ← ACTUALIZADO
 }
-```
+\`\`\`
 
 **Guardado en BD (`datos_actuales`):**
-```json
+\`\`\`json
 {
   "formData": { /* mismo contenido de arriba */ },
   "navigationHistory": [0, 1, 2, 3],
   "currentStep": 3
 }
-```
+\`\`\`
 
 **Campos actualizados en tabla:**
 - `datos_actuales` = JSON completo de arriba
@@ -180,7 +180,7 @@ Esto significa:
 ### 4. USUARIO AGREGA 2 ADMINS Y PRESIONA "SIGUIENTE" (Paso 3 → 4)
 
 **Body enviado:**
-```json
+\`\`\`json
 {
   "formData": {
     "empresa": { /* sin cambios */ },
@@ -216,14 +216,14 @@ Esto significa:
   "navigationHistory": [0, 1, 2, 3, 4],
   "currentStep": 4
 }
-```
+\`\`\`
 
 ---
 
 ### 5. USUARIO ELIGE "CARGAR TRABAJADORES EN CAPACITACIÓN" (Paso 4 → 6)
 
 **Body enviado:**
-```json
+\`\`\`json
 {
   "formData": {
     "empresa": { /* sin cambios */ },
@@ -238,7 +238,7 @@ Esto significa:
   "navigationHistory": [0, 1, 2, 3, 4, 6],  // ← Salta de 4 a 6 (omite 5)
   "currentStep": 6
 }
-```
+\`\`\`
 
 **IMPORTANTE:** Nota que `trabajadores` sigue siendo `[]` pero NO borra los admins.
 
@@ -249,7 +249,7 @@ Esto significa:
 **Endpoint:** `GET /api/onboarding/[id]`
 
 **Respuesta (datos guardados en sesión anterior):**
-```json
+\`\`\`json
 {
   "success": true,
   "data": {
@@ -283,7 +283,7 @@ Esto significa:
   "navigationHistory": [0, 1, 2, 3, 4, 6],
   "lastStep": 6                    // ← Continúa desde aquí
 }
-```
+\`\`\`
 
 ---
 
@@ -292,11 +292,11 @@ Esto significa:
 **NO se guarda nada en BD**
 
 **Solo actualiza estado local:**
-```javascript
+\`\`\`javascript
 // Estado local cambia a:
 currentStep = 4
 navigationHistory = [0, 1, 2, 3, 4]  // Remueve el 6
-```
+\`\`\`
 
 **BD no se toca** - Los datos siguen iguales hasta que presione "Siguiente"
 
@@ -305,7 +305,7 @@ navigationHistory = [0, 1, 2, 3, 4]  // Remueve el 6
 ### 8. USUARIO MODIFICA UN ADMIN Y PRESIONA "SIGUIENTE" (Paso 4 → 6 de nuevo)
 
 **Body enviado:**
-```json
+\`\`\`json
 {
   "formData": {
     "empresa": { /* sin cambios */ },
@@ -336,22 +336,22 @@ navigationHistory = [0, 1, 2, 3, 4]  // Remueve el 6
   "navigationHistory": [0, 1, 2, 3, 4, 6],  // Vuelve a agregar 6
   "currentStep": 6
 }
-```
+\`\`\`
 
 **Backend hace merge inteligente:**
-```javascript
+\`\`\`javascript
 // Compara:
 // BD tenía: admins[0].nombre = "Juan"
 // Frontend envía: admins[0].nombre = "Juan Carlos"
 // Resultado: ACTUALIZA a "Juan Carlos" (dato conocido diferente)
-```
+\`\`\`
 
 ---
 
 ### 9. USUARIO FINALIZA (Paso 10 → 11)
 
 **Body enviado:**
-```json
+\`\`\`json
 {
   "formData": {
     "empresa": { /* completo */ },
@@ -366,7 +366,7 @@ navigationHistory = [0, 1, 2, 3, 4]  // Remueve el 6
   "navigationHistory": [0, 1, 2, 3, 4, 6, 10, 11],
   "currentStep": 11
 }
-```
+\`\`\`
 
 **Campos actualizados en tabla:**
 - `datos_actuales` = JSON completo
@@ -380,7 +380,7 @@ navigationHistory = [0, 1, 2, 3, 4]  // Remueve el 6
 
 ## BACKEND: FUNCIÓN DE MERGE INTELIGENTE
 
-```typescript
+\`\`\`typescript
 function mergeFormData(existing: OnboardingFormData, incoming: OnboardingFormData) {
   return {
     empresa: {
@@ -431,13 +431,13 @@ function mergeFormData(existing: OnboardingFormData, incoming: OnboardingFormDat
     loadWorkersNow: incoming.loadWorkersNow
   }
 }
-```
+\`\`\`
 
 ---
 
 ## VALIDACIÓN EN FRONTEND (ANTES DE ENVIAR)
 
-```typescript
+\`\`\`typescript
 // En handleNext, antes de PATCH
 const dataToSend = {
   formData: formData,  // Estado actual COMPLETO de React
@@ -447,7 +447,7 @@ const dataToSend = {
 
 // Frontend SIEMPRE envía estructura completa
 // NUNCA envía datos parciales o undefined
-```
+\`\`\`
 
 ---
 
@@ -468,21 +468,21 @@ const dataToSend = {
 ### ¿Cómo eliminar un admin agregado por error?
 
 **En el frontend:**
-```typescript
+\`\`\`typescript
 // Usuario elimina admin con id=2
 const newAdmins = formData.admins.filter(a => a.id !== 2)
 setFormData({ ...formData, admins: newAdmins })
-```
+\`\`\`
 
 **Al presionar "Siguiente":**
-```json
+\`\`\`json
 {
   "admins": [
     { "id": 1, "nombre": "Juan", ... }
     // Admin con id=2 ya no está
   ]
 }
-```
+\`\`\`
 
 **Backend recibe:**
 - `incoming.admins.length = 1` (tiene elementos)
@@ -492,7 +492,7 @@ setFormData({ ...formData, admins: newAdmins })
 ### ¿Cómo distinguir "array vacío intencional" de "array vacío por no visitar paso"?
 
 **Por el contexto del navigationHistory:**
-```json
+\`\`\`json
 // Usuario saltó trabajadores
 {
   "navigationHistory": [0, 1, 2, 3, 4, 6],  // No visitó paso 5
@@ -504,10 +504,10 @@ setFormData({ ...formData, admins: newAdmins })
   "navigationHistory": [0, 1, 2, 3, 4, 5, 6],  // SÍ visitó paso 5
   "trabajadores": []  // ← Vacío intencionalmente (visitó pero no agregó)
 }
-```
+\`\`\`
 
 **Merge inteligente considera el historial:**
-```typescript
+\`\`\`typescript
 function mergeFormData(existing, incoming, incomingHistory) {
   const visitedWorkersStep = incomingHistory.includes(5)
   
@@ -519,13 +519,13 @@ function mergeFormData(existing, incoming, incomingHistory) {
           : existing.trabajadores)
   }
 }
-```
+\`\`\`
 
 ---
 
 ## ESTRUCTURA DE LA TABLA EN BD
 
-```sql
+\`\`\`sql
 CREATE TABLE onboardings (
   id UUID PRIMARY KEY,
   id_zoho TEXT NOT NULL,
@@ -537,10 +537,10 @@ CREATE TABLE onboardings (
   fecha_ultima_actualizacion TIMESTAMP DEFAULT NOW(),
   fecha_completado TIMESTAMP
 );
-```
+\`\`\`
 
 **Ejemplo de fila completa:**
-```
+\`\`\`
 id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 id_zoho: "12345678"
 estado: "en_progreso"

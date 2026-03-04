@@ -8,9 +8,9 @@ Esta API permite generar links únicos de onboarding con datos pre-llenados para
 
 ## Endpoint
 
-```
+\`\`\`
 POST /api/generate-link
-```
+\`\`\`
 
 **URL Base:** `https://tu-dominio.vercel.app`
 
@@ -20,11 +20,11 @@ POST /api/generate-link
 
 ## Headers Requeridos
 
-```json
+\`\`\`json
 {
   "Content-Type": "application/json"
 }
-```
+\`\`\`
 
 ---
 
@@ -66,7 +66,7 @@ POST /api/generate-link
 
 Debes seleccionar **exactamente uno** de estos valores para el campo `rubro`:
 
-```
+\`\`\`
 - "1. Agrícola"
 - "2. Condominio"
 - "3. Construcción"
@@ -89,7 +89,7 @@ Debes seleccionar **exactamente uno** de estos valores para el campo `rubro`:
 - "20. Servicios"
 - "21. Transporte"
 - "22. Turismo, Hotelería y Gastronomía"
-```
+\`\`\`
 
 **Nota importante:** El valor debe incluir el número y el punto tal como se muestra arriba.
 
@@ -97,13 +97,13 @@ Debes seleccionar **exactamente uno** de estos valores para el campo `rubro`:
 
 Debes incluir **al menos uno** de estos valores en el array `sistema`:
 
-```
+\`\`\`
 - "GeoVictoria BOX"    (Relojes Biométricos)
 - "GeoVictoria CALL"   (Marcaje por Llamada)
 - "GeoVictoria APP"    (Aplicación Móvil)
 - "GeoVictoria USB"    (Lector USB Biométrico)
 - "GeoVictoria WEB"    (Portal Web)
-```
+\`\`\`
 
 Puedes seleccionar múltiples sistemas de marcaje según las necesidades del cliente.
 
@@ -130,7 +130,7 @@ Si deseas pre-llenar datos de administradores, cada objeto del array debe tener:
 
 ### Payload Mínimo (Solo Empresa)
 
-```json
+\`\`\`json
 {
   "id_zoho": "3525045000561554077",
   "empresa": {
@@ -145,11 +145,11 @@ Si deseas pre-llenar datos de administradores, cada objeto del array debe tener:
     "sistema": ["GeoVictoria BOX", "GeoVictoria APP"]
   }
 }
-```
+\`\`\`
 
 ### Payload Completo (Empresa + Administradores)
 
-```json
+\`\`\`json
 {
   "id_zoho": "3525045000561554077",
   "empresa": {
@@ -183,13 +183,13 @@ Si deseas pre-llenar datos de administradores, cada objeto del array debe tener:
     }
   ]
 }
-```
+\`\`\`
 
 ### Ejemplo con Diferentes Industrias
 
 #### Ejemplo 1: Minería
 
-```json
+\`\`\`json
 {
   "id_zoho": "3525045000561554088",
   "empresa": {
@@ -205,11 +205,11 @@ Si deseas pre-llenar datos de administradores, cada objeto del array debe tener:
     "sistema": ["GeoVictoria BOX", "GeoVictoria CALL"]
   }
 }
-```
+\`\`\`
 
 #### Ejemplo 2: Retail
 
-```json
+\`\`\`json
 {
   "id_zoho": "3525045000561554099",
   "empresa": {
@@ -225,11 +225,11 @@ Si deseas pre-llenar datos de administradores, cada objeto del array debe tener:
     "sistema": ["GeoVictoria BOX", "GeoVictoria USB", "GeoVictoria WEB"]
   }
 }
-```
+\`\`\`
 
 #### Ejemplo 3: Educación
 
-```json
+\`\`\`json
 {
   "id_zoho": "3525045000561554100",
   "empresa": {
@@ -245,7 +245,7 @@ Si deseas pre-llenar datos de administradores, cada objeto del array debe tener:
     "sistema": ["GeoVictoria WEB", "GeoVictoria APP"]
   }
 }
-```
+\`\`\`
 
 ---
 
@@ -253,13 +253,13 @@ Si deseas pre-llenar datos de administradores, cada objeto del array debe tener:
 
 **Código HTTP:** `200 OK`
 
-```json
+\`\`\`json
 {
   "success": true,
   "link": "https://tu-dominio.vercel.app?token=ab39e615-944f-4f87-9ffd-4f4d05810ed8",
   "token": "ab39e615-944f-4f87-9ffd-4f4d05810ed8"
 }
-```
+\`\`\`
 
 ### Campos de Respuesta
 
@@ -275,40 +275,40 @@ Si deseas pre-llenar datos de administradores, cada objeto del array debe tener:
 
 ### Error 400: Payload Vacío
 
-```json
+\`\`\`json
 {
   "success": false,
   "error": "El body de la solicitud está vacío. Debes enviar un JSON con los datos de la empresa."
 }
-```
+\`\`\`
 
 ### Error 400: JSON Inválido
 
-```json
+\`\`\`json
 {
   "success": false,
   "error": "El body de la solicitud no es un JSON válido. Verifica el formato."
 }
-```
+\`\`\`
 
 ### Error 400: Falta Campo Empresa
 
-```json
+\`\`\`json
 {
   "success": false,
   "error": "Se requiere el campo 'empresa' o 'empresaData' con los datos de la empresa"
 }
-```
+\`\`\`
 
 ### Error 500: Error en Base de Datos
 
-```json
+\`\`\`json
 {
   "success": false,
   "error": "Error al crear registro en base de datos: [mensaje de error]",
   "details": { ... }
 }
-```
+\`\`\`
 
 ---
 
@@ -316,7 +316,7 @@ Si deseas pre-llenar datos de administradores, cada objeto del array debe tener:
 
 ### cURL
 
-```bash
+\`\`\`bash
 curl -X POST https://tu-dominio.vercel.app/api/generate-link \
   -H "Content-Type: application/json" \
   -d '{
@@ -344,11 +344,11 @@ curl -X POST https://tu-dominio.vercel.app/api/generate-link \
       }
     ]
   }'
-```
+\`\`\`
 
 ### JavaScript (Fetch)
 
-```javascript
+\`\`\`javascript
 const payload = {
   id_zoho: "3525045000561554077",
   empresa: {
@@ -390,11 +390,11 @@ fetch('https://tu-dominio.vercel.app/api/generate-link', {
   .catch(error => {
     console.error('Error:', error);
   });
-```
+\`\`\`
 
 ### Python (Requests)
 
-```python
+\`\`\`python
 import requests
 import json
 
@@ -435,7 +435,7 @@ data = response.json()
 
 print(f"Link generado: {data['link']}")
 print(f"Token: {data['token']}")
-```
+\`\`\`
 
 ---
 

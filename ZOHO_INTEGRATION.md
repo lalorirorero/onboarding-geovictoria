@@ -20,7 +20,7 @@ El sistema utiliza encriptación AES-GCM para proteger los datos sensibles en lo
 
 En Zoho Flow, crea una función que llame a tu API para generar el token:
 
-```javascript
+\`\`\`javascript
 // En Zoho Flow - Custom Function
 empresaData = {
   "razonSocial": account.Account_Name,
@@ -52,11 +52,11 @@ generatedLink = response.get("link");
 token = response.get("token");
 
 // Ahora puedes enviar este link por email al cliente
-```
+\`\`\`
 
 ### Paso 2: Ejemplo de datos para generar token
 
-```json
+\`\`\`json
 {
   "empresaData": {
     "razonSocial": "EDALTEC LTDA",
@@ -71,15 +71,15 @@ token = response.get("token");
     "rubro": "5.- DISTRIBUCIÓN"
   }
 }
-```
+\`\`\`
 
 ### Paso 3: Link generado
 
 El sistema devolverá un link como:
 
-```
+\`\`\`
 https://tu-dominio.com/?token=AaBbCcDdEeFf123456789XyZ...
-```
+\`\`\`
 
 Este token contiene todos los datos de la empresa encriptados de forma segura.
 
@@ -122,7 +122,7 @@ Cuando el usuario finaliza el formulario, los datos se envían automáticamente 
 
 ### Estructura de datos recibidos:
 
-```json
+\`\`\`json
 {
   "timestamp": "2025-01-15T10:30:00.000Z",
   "formData": {
@@ -162,11 +162,11 @@ Cuando el usuario finaliza el formulario, los datos se envían automáticamente 
     "completedAt": "2025-01-15T10:30:00.000Z"
   }
 }
-```
+\`\`\`
 
 ### Procesar datos en Zoho Flow:
 
-```javascript
+\`\`\`javascript
 // En Zoho Flow - Webhook Receiver
 empresaData = webhook.formData.empresa;
 trabajadoresData = webhook.formData.trabajadores;
@@ -195,13 +195,13 @@ sendEmail({
   "subject": "Nuevo onboarding completado: " + empresaData.nombreFantasia,
   "body": "El cliente " + empresaData.nombreFantasia + " ha completado el onboarding con " + trabajadoresData.size() + " trabajadores."
 });
-```
+\`\`\`
 
 ---
 
 ## 4. Flujo Completo de Integración
 
-```
+\`\`\`
 ┌─────────────────┐
 │   Zoho CRM      │
 │  (Nuevo Deal)   │
@@ -242,13 +242,13 @@ sendEmail({
 │  Zoho Flow      │
 │  Procesa datos  │ ──► Actualiza CRM, crea registros
 └─────────────────┘
-```
+\`\`\`
 
 ---
 
 ## 5. Variables de Entorno Requeridas
 
-```env
+\`\`\`env
 # Webhook de Zoho Flow para recibir datos completados
 ZOHO_FLOW_TEST_URL=https://flow.zoho.com/1234567890/flow/webhook/...
 
@@ -257,14 +257,14 @@ ENCRYPTION_SECRET=tu-clave-secreta-super-segura-cambiar-en-produccion
 
 # URL base de tu aplicación (para generar links correctos)
 NEXT_PUBLIC_BASE_URL=https://tu-dominio.com
-```
+\`\`\`
 
 ### Generar una clave de encriptación segura:
 
-```bash
+\`\`\`bash
 # En tu terminal
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
+\`\`\`
 
 ---
 
@@ -275,7 +275,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 **Endpoint:** `POST /api/generate-link`
 
 **Body:**
-```json
+\`\`\`json
 {
   "empresaData": {
     "razonSocial": "...",
@@ -283,30 +283,30 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
     "rut": "..."
   }
 }
-```
+\`\`\`
 
 **Response:**
-```json
+\`\`\`json
 {
   "success": true,
   "link": "https://tu-dominio.com/?token=XYZ...",
   "token": "XYZ..."
 }
-```
+\`\`\`
 
 ### 6.2 Desencriptar Token (interno)
 
 **Endpoint:** `POST /api/decrypt-token`
 
 **Body:**
-```json
+\`\`\`json
 {
   "token": "XYZ..."
 }
-```
+\`\`\`
 
 **Response:**
-```json
+\`\`\`json
 {
   "success": true,
   "empresaData": {
@@ -314,7 +314,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
     "nombreFantasia": "..."
   }
 }
-```
+\`\`\`
 
 ### 6.3 Enviar Datos a Zoho Flow
 
@@ -328,7 +328,7 @@ Este endpoint se llama automáticamente cuando el usuario finaliza el formulario
 
 ### Probar generación de token:
 
-```bash
+\`\`\`bash
 curl -X POST https://tu-dominio.com/api/generate-link \
   -H "Content-Type: application/json" \
   -d '{
@@ -338,7 +338,7 @@ curl -X POST https://tu-dominio.com/api/generate-link \
       "rut": "12345678-9"
     }
   }'
-```
+\`\`\`
 
 ### Probar el botón de prueba:
 

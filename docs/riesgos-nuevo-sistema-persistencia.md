@@ -12,13 +12,13 @@
 Auto-save se ejecuta cada 5 segundos, pero también guardamos en cada cambio de paso. Podrían ejecutarse simultáneamente.
 
 **Escenario:**
-```
+\`\`\`
 t=0s:   Usuario llena admin y hace clic en "Siguiente"
 t=0.1s: handleNext llama PATCH /api/onboarding/[id] → { admins: [admin1] }
 t=0.2s: Auto-save se ejecuta → llama PATCH /api/onboarding/[id] → { admins: [admin1] }
 t=0.3s: Respuesta 1 llega (handleNext)
 t=0.4s: Respuesta 2 llega (auto-save) con datos viejos → podría sobrescribir
-```
+\`\`\`
 
 **Consecuencia:**
 - Dos requests simultáneos al mismo endpoint
@@ -26,7 +26,7 @@ t=0.4s: Respuesta 2 llega (auto-save) con datos viejos → podría sobrescribir
 - Posible pérdida de datos si auto-save tiene estado desactualizado
 
 **Mitigación en el prompt:**
-```typescript
+\`\`\`typescript
 // Frontend: Cancelar auto-save al hacer cambio manual
 const handleNext = useCallback(async () => {
   // Detener auto-save temporalmente
@@ -38,7 +38,7 @@ const handleNext = useCallback(async () => {
   // Reiniciar auto-save después
   startAutoSave()
 }, [...])
-```
+\`\`\`
 
 **Riesgo residual:** MEDIO - El prompt tiene merge inteligente en backend que debería proteger
 
@@ -50,24 +50,24 @@ const handleNext = useCallback(async () => {
 La lógica de merge en backend solo sobrescribe arrays si tienen datos. Pero ¿qué pasa si el usuario ELIMINA un item?
 
 **Escenario:**
-```json
+\`\`\`json
 BD tiene:     { "admins": [admin1, admin2] }
 Usuario elimina admin2 en frontend
 Frontend envía: { "admins": [admin1] }
 Backend merge: Ve que array tiene datos (length > 0) → actualiza
 Resultado:    { "admins": [admin1] } ✅
-```
+\`\`\`
 
 ✅ **Funciona bien si el array tiene datos**
 
 Pero:
-```json
+\`\`\`json
 BD tiene:     { "admins": [admin1] }
 Usuario elimina admin1 (único admin)
 Frontend envía: { "admins": [] }
 Backend merge: Ve array vacío → NO actualiza por REGLA DE ORO
 Resultado:    { "admins": [admin1] } ❌ NO se eliminó
-```
+\`\`\`
 
 **Consecuencia:**
 - Usuario no puede eliminar el ÚLTIMO item de un array
@@ -79,7 +79,7 @@ Necesitamos diferenciar entre:
 - `admins: []` conocido y deliberado (usuario eliminó todo)
 
 **Propuesta:**
-```typescript
+\`\`\`typescript
 // Agregar metadatos de intención
 {
   formData: {
@@ -94,7 +94,7 @@ Necesitamos diferenciar entre:
 if (incomingData._meta?.admins_intentional_empty) {
   merged.admins = []  // Permitir array vacío
 }
-```
+\`\`\`
 
 **Riesgo:** ALTO - No está implementado en el prompt actual
 
@@ -106,7 +106,7 @@ if (incomingData._meta?.admins_intentional_empty) {
 Los useCallback capturan valores en sus dependencias, pero si formData cambia muy rápido, el callback puede tener datos viejos.
 
 **Escenario:**
-```typescript
+\`\`\`typescript
 const handleNext = useCallback(async () => {
   // Este formData viene de las dependencias al momento de crear el callback
   await fetch('/api/onboarding/id', {
@@ -118,14 +118,14 @@ const handleNext = useCallback(async () => {
 setFormData({ ...formData, admins: [admin1] })  // t=0ms
 // React no actualiza el callback inmediatamente
 handleNext()  // t=50ms ← Usa formData viejo sin admin1
-```
+\`\`\`
 
 **Consecuencia:**
 - Callback usa estado desactualizado
 - Se envían datos viejos a la BD
 
 **Mitigación requerida:**
-```typescript
+\`\`\`typescript
 // Usar refs para datos siempre actualizados
 const formDataRef = useRef(formData)
 useEffect(() => {
@@ -137,7 +137,7 @@ const handleNext = useCallback(async () => {
     body: JSON.stringify({ formData: formDataRef.current })  // ✅ Siempre actual
   })
 }, [/* no incluir formData */])
-```
+\`\`\`
 
 **Riesgo:** ALTO - El prompt usa dependencias directas sin refs
 
@@ -151,13 +151,13 @@ const handleNext = useCallback(async () => {
 Cada API route crea su propio cliente de Supabase. Si las credenciales son incorrectas o hay límite de conexiones, puede fallar.
 
 **Código en prompt:**
-```typescript
+\`\`\`typescript
 // En cada route.ts:
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
-```
+\`\`\`
 
 **Riesgos:**
 - Crear cliente en cada request → overhead
@@ -165,7 +165,7 @@ const supabase = createClient(
 - No hay singleton pattern
 
 **Solución requerida:**
-```typescript
+\`\`\`typescript
 // lib/supabase-server.ts (singleton)
 let supabaseInstance: SupabaseClient | null = null
 
@@ -178,7 +178,7 @@ export function getSupabaseServer() {
   }
   return supabaseInstance
 }
-```
+\`\`\`
 
 **Riesgo:** MEDIO - Funciona pero no es óptimo
 
@@ -190,12 +190,12 @@ export function getSupabaseServer() {
 El token ahora es el UUID directo. Si alguien pasa un UUID inválido o inexistente, la API falla.
 
 **Escenario:**
-```
+\`\`\`
 Usuario modifica URL: ?token=123-fake-uuid
 Frontend llama: GET /api/onboarding/123-fake-uuid
 Backend busca en BD: no encuentra nada
 Retorna 404: "Onboarding no encontrado"
-```
+\`\`\`
 
 **Riesgos:**
 - Usuario ve error genérico
@@ -203,14 +203,14 @@ Retorna 404: "Onboarding no encontrado"
 - Posible scanning de UUIDs válidos (aunque difícil)
 
 **Solución requerida:**
-```typescript
+\`\`\`typescript
 // Validar formato UUID antes de consultar BD
 import { validate as isValidUUID } from 'uuid'
 
 if (!isValidUUID(id)) {
   return NextResponse.json({ success: false, error: 'Token inválido' }, { status: 400 })
 }
-```
+\`\`\`
 
 **Riesgo:** BAJO - Más un tema de UX que de pérdida de datos
 
@@ -222,21 +222,21 @@ if (!isValidUUID(id)) {
 Cuando usuario presiona "Atrás", se elimina el último paso del historial. Si fue un error, no puede volver hacia adelante.
 
 **Código en prompt:**
-```typescript
+\`\`\`typescript
 const handlePrev = useCallback(async () => {
   const newHistory = navigationHistory.slice(0, -1)  // Elimina último paso
   setNavigationHistory(newHistory)
   // ...
 }, [navigationHistory])
-```
+\`\`\`
 
 **Escenario:**
-```
+\`\`\`
 Usuario está en: [0, 1, 2, 3, 4, 5, 6, 10]  paso=10
 Presiona "Atrás": [0, 1, 2, 3, 4, 5, 6]     paso=6
 Presiona "Atrás": [0, 1, 2, 3, 4, 5]        paso=5
 ¡Ups! Quería volver a paso 10 pero ahora perdió el historial de 6→10
-```
+\`\`\`
 
 **Consecuencia:**
 - No hay "Rehacer" (forward navigation)
@@ -244,7 +244,7 @@ Presiona "Atrás": [0, 1, 2, 3, 4, 5]        paso=5
 
 **Solución requerida:**
 Implementar historial completo con índice:
-```typescript
+\`\`\`typescript
 const [fullHistory, setFullHistory] = useState([0])
 const [historyIndex, setHistoryIndex] = useState(0)
 
@@ -263,7 +263,7 @@ const handleForward = () => {
     setCurrentStep(fullHistory[historyIndex + 1])
   }
 }
-```
+\`\`\`
 
 **Riesgo:** MEDIO - UX mejorable pero no pierde datos permanentes
 
@@ -277,12 +277,12 @@ const handleForward = () => {
 El prompt indica que sendProgressWebhook es "fire-and-forget", no espera respuesta.
 
 **Código:**
-```typescript
+\`\`\`typescript
 fetch('/api/submit-to-zoho', {
   method: 'POST',
   body: JSON.stringify(payload)
 }).catch(console.error)  // Solo log, no bloquea
-```
+\`\`\`
 
 **Riesgos:**
 - Si Zoho Flow falla, no hay retry
@@ -290,7 +290,7 @@ fetch('/api/submit-to-zoho', {
 - No hay trazabilidad de webhooks fallidos
 
 **Solución requerida:**
-```typescript
+\`\`\`typescript
 // Agregar tabla de webhooks
 CREATE TABLE webhook_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -304,7 +304,7 @@ CREATE TABLE webhook_logs (
 );
 
 // Implementar cola de reintentos
-```
+\`\`\`
 
 **Riesgo:** MEDIO - Problema de observabilidad, no de pérdida de datos
 
@@ -327,7 +327,7 @@ Auto-save cada 5 segundos + guardar en cada paso = muchas escrituras en BD.
 - Logs enormes
 
 **Solución:**
-```typescript
+\`\`\`typescript
 // Auto-save inteligente: solo si hay cambios
 let lastSavedData = JSON.stringify(formData)
 
@@ -338,7 +338,7 @@ const interval = setInterval(() => {
     lastSavedData = currentData
   }
 }, 5000)
-```
+\`\`\`
 
 **Riesgo:** BAJO - Funcional pero costoso
 
@@ -350,14 +350,14 @@ const interval = setInterval(() => {
 El prompt no incluye feedback visual de cuándo se guarda.
 
 **UX Problem:**
-```
+\`\`\`
 Usuario escribe datos...
 // ¿Se guardó? No hay feedback
 Usuario cierra navegador esperando que se guardó
-```
+\`\`\`
 
 **Solución requerida:**
-```typescript
+\`\`\`typescript
 const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error' | null>(null)
 
 // Auto-save con feedback
@@ -373,7 +373,7 @@ const saveToDatabase = async () => {
 }
 
 // UI: mostrar "Guardando..." o "✓ Guardado"
-```
+\`\`\`
 
 **Riesgo:** BAJO - UX mejorable
 
@@ -385,7 +385,7 @@ const saveToDatabase = async () => {
 handleFinalizar marca el onboarding como 'completado' pero solo valida empresa y admins.
 
 **Escenario:**
-```typescript
+\`\`\`typescript
 const handleFinalizar = async () => {
   // ¿Validación completa de todos los datos?
   // ¿Qué pasa si hay datos inconsistentes?
@@ -395,7 +395,7 @@ const handleFinalizar = async () => {
     fecha_completado: NOW()
   })
 }
-```
+\`\`\`
 
 **Riesgos:**
 - Onboarding marcado como completo con datos incompletos
@@ -403,7 +403,7 @@ const handleFinalizar = async () => {
 - No se puede "reabrir" onboarding después
 
 **Solución requerida:**
-```typescript
+\`\`\`typescript
 const validateAllData = (formData: OnboardingFormData): boolean => {
   // Validar empresa (obligatorio)
   if (!validateEmpresaFields(formData.empresa)) return false
@@ -427,7 +427,7 @@ const handleFinalizar = async () => {
   }
   // ...
 }
-```
+\`\`\`
 
 **Riesgo:** MEDIO - Problema de integridad de datos
 
@@ -459,12 +459,12 @@ Onboardings con estado 'pendiente' o 'en_progreso' se quedan en BD para siempre.
 - Costo de almacenamiento
 
 **Solución:**
-```sql
+\`\`\`sql
 -- Job automático para limpiar onboardings viejos
 DELETE FROM onboardings 
 WHERE estado != 'completado' 
 AND fecha_ultima_actualizacion < NOW() - INTERVAL '30 days';
-```
+\`\`\`
 
 **Riesgo:** BAJO - Problema de housekeeping
 

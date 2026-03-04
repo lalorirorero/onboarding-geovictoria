@@ -20,11 +20,11 @@ Esta guía explica cómo implementar encriptación compatible entre Zoho CRM (us
 ## Variables de Entorno Necesarias
 
 ### En Next.js (Vercel)
-```env
+\`\`\`env
 ENCRYPTION_SECRET=tu-clave-secreta-de-32-caracteres-minimo
 NEXT_PUBLIC_BASE_URL=https://tu-app.vercel.app
 ZOHO_FLOW_TEST_URL=https://flows.zoho.com/do/dev/your-flow-id
-```
+\`\`\`
 
 ### En Zoho CRM
 Crear una variable personalizada en Settings → Developer Space → Variables:
@@ -41,7 +41,7 @@ Crea una función personalizada en Zoho CRM (Setup → Functions → Create Func
 
 ### Función: `generateOnboardingLink`
 
-```javascript
+\`\`\`javascript
 // Función para generar link de onboarding con datos encriptados
 string generateOnboardingLink(string dealId) {
   
@@ -89,7 +89,7 @@ string generateOnboardingLink(string dealId) {
   
   return fullLink;
 }
-```
+\`\`\`
 
 ### Usar la función en un Workflow o Button
 
@@ -112,7 +112,7 @@ string generateOnboardingLink(string dealId) {
 
 ### Por Email (usando Workflow)
 
-```javascript
+\`\`\`javascript
 // En el workflow, después de generar el link
 dealRecord = zoho.crm.getRecordById("Deals", dealId.toLong());
 onboardingLink = dealRecord.get("Onboarding_Link");
@@ -125,14 +125,14 @@ sendmail [
   subject: "Completa tu proceso de Onboarding"
   message: "Hola,<br><br>Por favor completa tu proceso de onboarding en el siguiente link:<br><br><a href='" + onboardingLink + "'>Comenzar Onboarding</a><br><br>Saludos,<br>El equipo"
 ]
-```
+\`\`\`
 
 ### Por WhatsApp (usando Zoho Flow)
 
-```javascript
+\`\`\`javascript
 // Trigger: Workflow llama a Zoho Flow webhook
 // Flow envía mensaje de WhatsApp con el link
-```
+\`\`\`
 
 ---
 
@@ -147,7 +147,7 @@ La aplicación Next.js ya tiene implementado el sistema de desencriptación auto
 4. Pre-llena el formulario con los datos del Deal
 
 ### Verificar que funciona:
-```typescript
+\`\`\`typescript
 // Los datos desencriptados se usan automáticamente en el componente
 useEffect(() => {
   const token = searchParams.get('token')
@@ -163,7 +163,7 @@ useEffect(() => {
     })
   }
 }, [searchParams])
-```
+\`\`\`
 
 ---
 
@@ -181,7 +181,7 @@ Cuando el usuario completa el formulario, los datos se envían automáticamente 
 
 El webhook recibe este JSON:
 
-```json
+\`\`\`json
 {
   "empresa": {
     "razonSocial": "EDALTEC LTDA",
@@ -226,11 +226,11 @@ El webhook recibe este JSON:
   },
   "completedAt": "2025-01-07T10:30:00.000Z"
 }
-```
+\`\`\`
 
 3. **Procesar datos en Zoho Flow**
 
-```javascript
+\`\`\`javascript
 // Action: Zoho CRM → Update Deal
 dealId = input.dealId; // Pasar dealId en el webhook si es necesario
 updateMap = Map();
@@ -262,7 +262,7 @@ if (input.excelFile != null) {
   fileContent = zoho.encryption.base64decode(input.excelFile.content);
   zoho.crm.attachFile("Deals", dealId, input.excelFile.name, fileContent);
 }
-```
+\`\`\`
 
 ---
 
@@ -296,15 +296,15 @@ if (input.excelFile != null) {
 ## Testing
 
 ### Test 1: Generar Link desde Zoho CRM
-```javascript
+\`\`\`javascript
 // En Zoho CRM Developer Console
 dealId = "123456789";
 link = generateOnboardingLink(dealId);
 info link; // Debería mostrar: https://tu-app.vercel.app?token=...
-```
+\`\`\`
 
 ### Test 1.5: Desencriptar Manualmente en Zoho (para debugging)
-```javascript
+\`\`\`javascript
 // Para verificar que la encriptación funciona correctamente
 encryptionKey = organization.getVariable("ENCRYPTION_KEY");
 
@@ -324,21 +324,21 @@ decoded = zoho.encryption.base64decode(token);
 decrypted = zoho.encryption.aesDecode128(decoded, encryptionKey);
 info "Datos desencriptados: " + decrypted;
 // Debería mostrar el mismo JSON original
-```
+\`\`\`
 
 ### Test 2: Desencriptar en Next.js
-```bash
+\`\`\`bash
 # Copiar el token del link generado
 # Abrir: https://tu-app.vercel.app?token=COPIAR_TOKEN_AQUI
 # Verificar que el formulario se pre-llena con datos correctos
-```
+\`\`\`
 
 ### Test 3: Webhook a Zoho Flow
-```bash
+\`\`\`bash
 # Completar el formulario
 # Verificar en Zoho Flow que se recibió el webhook
 # Verificar en Zoho CRM que se actualizó el Deal
-```
+\`\`\`
 
 ---
 
@@ -377,14 +377,14 @@ info "Datos desencriptados: " + decrypted;
 
 Cuando llames a la API desde Zoho CRM o Zoho Flow, solo necesitas el siguiente header:
 
-```
+\`\`\`
 Content-Type: application/json
-```
+\`\`\`
 
 **NO necesitas** el header `Host` - Zoho lo maneja automáticamente como parámetro del sistema.
 
 ### Ejemplo de llamada desde Zoho Deluge:
-```javascript
+\`\`\`javascript
 // Llamar a la API para generar link
 response = invokeurl [
   url: "https://tu-app.vercel.app/api/generate-link"
@@ -392,7 +392,7 @@ response = invokeurl [
   headers: {"Content-Type": "application/json"}
   parameters: jsonBody
 ];
-```
+\`\`\`
 
 ---
 

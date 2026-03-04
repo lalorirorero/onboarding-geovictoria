@@ -15,7 +15,7 @@
 ## PASO 2: EMPRESA (✅ COMPLETO)
 
 ### Validaciones Implementadas:
-```typescript
+\`\`\`typescript
 const validateEmpresaFields = (empresa: any): { isValid: boolean; errors: string[] } => {
   const errors: string[] = []
   
@@ -40,7 +40,7 @@ const validateEmpresaFields = (empresa: any): { isValid: boolean; errors: string
   
   return { isValid: errors.length === 0, errors }
 }
-```
+\`\`\`
 
 ### Estado: ✅ NO REQUIERE CAMBIOS
 - Todos los campos obligatorios validados
@@ -52,7 +52,7 @@ const validateEmpresaFields = (empresa: any): { isValid: boolean; errors: string
 ## PASO 3: ADMINISTRADORES (✅ COMPLETO)
 
 ### Validaciones Implementadas:
-```typescript
+\`\`\`typescript
 const validateAdminsFields = (admins: any[]): { isValid: boolean; errors: string[] } => {
   const errors: string[] = []
   
@@ -76,7 +76,7 @@ const validateAdminsFields = (admins: any[]): { isValid: boolean; errors: string
   
   return { isValid: errors.length === 0, errors }
 }
-```
+\`\`\`
 
 ### Campos validados:
 - Mínimo 1 administrador
@@ -96,16 +96,16 @@ Ya implementado en `handleNext` paso 3.
 **En formulario individual:** ❌ NO HAY VALIDACIONES
 
 ### Problema Identificado:
-```typescript
+\`\`\`typescript
 // TrabajadoresStep - NO HAY VALIDACIÓN antes de agregar
 const updateTrabajador = (id, field, value) => {
   const updated = trabajadores.map((t) => (t.id === id ? { ...t, [field]: value } : t))
   setTrabajadores(updated)
 }
-```
+\`\`\`
 
 ### Campos del trabajador:
-```typescript
+\`\`\`typescript
 {
   id: number
   nombre: string          // ⚠️ Sin validación
@@ -117,7 +117,7 @@ const updateTrabajador = (id, field, value) => {
   telefono3: string      // Opcional
   tipo: "usuario" | "administrador"
 }
-```
+\`\`\`
 
 ### Validaciones Recomendadas:
 1. **Nombre completo**: Obligatorio, mínimo 3 caracteres
@@ -127,7 +127,7 @@ const updateTrabajador = (id, field, value) => {
 5. **Teléfono1**: Obligatorio, mínimo 8 dígitos
 
 ### Implementación Sugerida:
-```typescript
+\`\`\`typescript
 const validateTrabajadorFields = (trabajador: any): { isValid: boolean; errors: Record<string, string> } => {
   const errors: Record<string, string> = {}
   
@@ -160,10 +160,10 @@ const validateTrabajadorFields = (trabajador: any): { isValid: boolean; errors: 
     errors
   }
 }
-```
+\`\`\`
 
 ### Validación en handleNext:
-```typescript
+\`\`\`typescript
 else if (currentStep === 5) {
   // Validar que todos los trabajadores tengan campos completos
   const incompletos = formData.trabajadores.filter(t => {
@@ -180,7 +180,7 @@ else if (currentStep === 5) {
     return
   }
 }
-```
+\`\`\`
 
 ### Estado: ⚠️ REQUIERE IMPLEMENTACIÓN
 El paso puede ser saltado (opción "En capacitación"), pero si el usuario decide completarlo, debe tener validaciones.
@@ -190,7 +190,7 @@ El paso puede ser saltado (opción "En capacitación"), pero si el usuario decid
 ## PASO 7: TURNOS (⚠️ REQUIERE MEJORAS)
 
 ### Validaciones Actuales:
-```typescript
+\`\`\`typescript
 const handleAddTurno = () => {
   // Solo valida nombre
   if (!formTurno.nombre.trim()) {
@@ -201,10 +201,10 @@ const handleAddTurno = () => {
   // Agrega sin validar otros campos
   setTurnos([...turnos, { id: Date.now(), ...formTurno }])
 }
-```
+\`\`\`
 
 ### Campos del turno:
-```typescript
+\`\`\`typescript
 {
   id: number
   nombre: string               // ✅ Validado
@@ -216,7 +216,7 @@ const handleAddTurno = () => {
   colacionFin: string         // ⚠️ Sin validación (si tipoColacion = "fija")
   tooltip: string             // Opcional
 }
-```
+\`\`\`
 
 ### Problemas Identificados:
 1. **No valida horaInicio y horaFin**: Pueden estar vacíos
@@ -225,7 +225,7 @@ const handleAddTurno = () => {
 4. **No valida minutos de colación**: Puede ser negativo o excesivo
 
 ### Validaciones Recomendadas:
-```typescript
+\`\`\`typescript
 const validateTurnoFields = (turno: any): { isValid: boolean; errors: Record<string, string> } => {
   const errors: Record<string, string> = {}
   
@@ -282,10 +282,10 @@ const validateTurnoFields = (turno: any): { isValid: boolean; errors: Record<str
     errors
   }
 }
-```
+\`\`\`
 
 ### Validación en handleNext:
-```typescript
+\`\`\`typescript
 else if (currentStep === 7) {
   if (formData.turnos.length === 0) {
     toast({
@@ -311,7 +311,7 @@ else if (currentStep === 7) {
     return
   }
 }
-```
+\`\`\`
 
 ### Estado: ⚠️ REQUIERE IMPLEMENTACIÓN
 Validación básica existe (nombre), pero faltan validaciones de horarios y lógica de negocio.
@@ -321,7 +321,7 @@ Validación básica existe (nombre), pero faltan validaciones de horarios y lóg
 ## PASO 8: PLANIFICACIONES (⚠️ REQUIERE MEJORAS)
 
 ### Validaciones Actuales:
-```typescript
+\`\`\`typescript
 const addPlanificacion = () => {
   if (!formData.nombre.trim()) {
     alert("Por favor ingresa el nombre de la planificación")
@@ -337,23 +337,23 @@ const addPlanificacion = () => {
   // Agrega planificación
   setPlanificaciones([...planificaciones, { id: Date.now(), ...formData }])
 }
-```
+\`\`\`
 
 ### Campos de planificación:
-```typescript
+\`\`\`typescript
 {
   id: number
   nombre: string                        // ✅ Validado
   diasTurnos: (number | null)[]        // ✅ Validado completitud (7 días)
 }
-```
+\`\`\`
 
 ### Problemas Identificados:
 1. **No valida turnos existentes**: Puede referenciar IDs de turnos eliminados
 2. **No valida nombres duplicados**: Puede haber 2 planificaciones con mismo nombre
 
 ### Validaciones Recomendadas:
-```typescript
+\`\`\`typescript
 const validatePlanificacionFields = (
   planificacion: any, 
   turnosDisponibles: any[], 
@@ -396,10 +396,10 @@ const validatePlanificacionFields = (
     errors
   }
 }
-```
+\`\`\`
 
 ### Validación en handleNext:
-```typescript
+\`\`\`typescript
 else if (currentStep === 8) {
   if (formData.planificaciones.length === 0) {
     toast({
@@ -429,7 +429,7 @@ else if (currentStep === 8) {
     return
   }
 }
-```
+\`\`\`
 
 ### Estado: ⚠️ REQUIERE MEJORAS
 Validación básica existe, pero falta validar referencias y duplicados.
@@ -439,7 +439,7 @@ Validación básica existe, pero falta validar referencias y duplicados.
 ## PASO 9: ASIGNACIONES (⚠️ REQUIERE MEJORAS)
 
 ### Validaciones Actuales:
-```typescript
+\`\`\`typescript
 else if (currentStep === 9) {
   const incompleteAssignments = formData.asignaciones.filter(
     (a) => !a.trabajadorId || !a.planificacionId || !a.desde || 
@@ -455,10 +455,10 @@ else if (currentStep === 9) {
     return
   }
 }
-```
+\`\`\`
 
 ### Campos de asignación:
-```typescript
+\`\`\`typescript
 {
   id: number
   trabajadorId: string | number         // ✅ Validado no vacío
@@ -466,7 +466,7 @@ else if (currentStep === 9) {
   desde: string                         // ✅ Validado no vacío
   hasta: string                         // ✅ Validado no vacío o "permanente"
 }
-```
+\`\`\`
 
 ### Problemas Identificados:
 1. **No valida referencias**: trabajadorId/planificacionId pueden no existir
@@ -475,7 +475,7 @@ else if (currentStep === 9) {
 4. **No valida formato de fecha**: Puede ser string inválido
 
 ### Validaciones Recomendadas:
-```typescript
+\`\`\`typescript
 const validateAsignacionFields = (
   asignacion: any,
   trabajadoresDisponibles: any[],
@@ -541,10 +541,10 @@ const validateAsignacionFields = (
     errors
   }
 }
-```
+\`\`\`
 
 ### Validación en handleNext:
-```typescript
+\`\`\`typescript
 else if (currentStep === 9) {
   if (formData.asignaciones.length === 0) {
     toast({
@@ -575,7 +575,7 @@ else if (currentStep === 9) {
     return
   }
 }
-```
+\`\`\`
 
 ### Estado: ⚠️ REQUIERE MEJORAS
 Validación básica de campos completos existe, pero faltan validaciones de lógica de negocio.

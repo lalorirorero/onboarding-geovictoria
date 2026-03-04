@@ -42,7 +42,7 @@ El sistema distingue entre:
 ### Envío Final
 El payload enviado a Zoho Flow incluye:
 
-```json
+\`\`\`json
 {
   "formData": { ... todos los datos ... },
   "protection": {
@@ -57,7 +57,7 @@ El payload enviado a Zoho Flow incluye:
     "userInputFields": ["campo1", "campo2", ...]
   }
 }
-```
+\`\`\`
 
 ## Componentes
 
@@ -77,7 +77,7 @@ Envuelve un paso completo. Props:
 
 ## Hook useDataProtection
 
-```typescript
+\`\`\`typescript
 const {
   // Verificaciones
   isFieldPrefilled,
@@ -95,13 +95,13 @@ const {
   getChangesSummary,
   prepareFinalSubmission,
 } = useDataProtection({ prefilledData, onboardingId })
-```
+\`\`\`
 
 ## Integración con Zoho Flow
 
 En Zoho Flow, puedes procesar la información de protección:
 
-```javascript
+\`\`\`javascript
 // Verificar si hubo cambios en datos prellenados
 if (payload.protection.editedPrefilledFields.length > 0) {
   // Notificar al equipo comercial sobre cambios

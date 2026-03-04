@@ -49,15 +49,15 @@ Valores para `Onboarding_Status`:
 
 #### **Trigger: Cuando se crea o actualiza un Account**
 
-```
+\`\`\`
 Trigger: Zoho CRM → Record Created/Updated
 Module: Accounts
 Condition: Onboarding_Status = "Pendiente"
-```
+\`\`\`
 
 #### **Acción 1: Generar el Token**
 
-```
+\`\`\`
 Action: Webhook → Custom
 Method: POST
 URL: https://TU-DOMINIO.com/api/generate-link
@@ -79,24 +79,24 @@ Body (JSON):
     "rubro": ${Accounts.Industry_Category}
   }
 }
-```
+\`\`\`
 
 **Nota:** Ajusta los nombres de los campos según tu configuración de Zoho CRM.
 
 #### **Acción 2: Guardar el Link en el Account**
 
-```
+\`\`\`
 Action: Zoho CRM → Update Record
 Module: Accounts
 Record ID: ${Accounts.id}
 Fields to Update:
   - Onboarding_Link: ${step2.link}
   - Onboarding_Status: "Link Generado"
-```
+\`\`\`
 
 #### **Acción 3: Enviar Email al Cliente**
 
-```
+\`\`\`
 Action: Send Email
 To: ${Accounts.Billing_Email}
 Subject: Completa tu información de onboarding - ${Accounts.Account_Name}
@@ -115,7 +115,7 @@ Body:
 
   Saludos,
   Equipo de Onboarding
-```
+\`\`\`
 
 ---
 
@@ -128,7 +128,7 @@ Body:
 
 #### **Acción 1: Actualizar Account en CRM**
 
-```
+\`\`\`
 Action: Zoho CRM → Update Record
 Module: Accounts
 Search by: Tax_ID = ${webhook.formData.empresa.rut}
@@ -136,11 +136,11 @@ Fields to Update:
   - Onboarding_Status: "Completado"
   - Account_Name: ${webhook.formData.empresa.razonSocial}
   - Trading_Name: ${webhook.formData.empresa.nombreFantasia}
-```
+\`\`\`
 
 #### **Acción 2: Crear Contactos de los Trabajadores**
 
-```
+\`\`\`
 Action: Loop → For Each
 Items: ${webhook.formData.trabajadores}
 
@@ -152,11 +152,11 @@ Inside Loop:
     - Email: ${item.correo}
     - Phone: ${item.telefono1}
     - Account_Name: [Link to Account from previous step]
-```
+\`\`\`
 
 #### **Acción 3: Notificar al Equipo**
 
-```
+\`\`\`
 Action: Send Email
 To: ventas@tuempresa.com
 Subject: ✅ Onboarding Completado - ${webhook.formData.empresa.nombreFantasia}
@@ -170,7 +170,7 @@ Body:
   - Fecha de completado: ${webhook.timestamp}
 
   Puedes revisar los detalles en Zoho CRM.
-```
+\`\`\`
 
 ---
 
@@ -180,7 +180,7 @@ Body:
 
 1. Ve a **Accounts** en Zoho CRM
 2. Crea un nuevo Account de prueba con estos datos:
-   ```
+   \`\`\`
    Account Name: Test Company LTDA
    Trading Name: Test Company
    Tax ID: 12345678-9
@@ -191,7 +191,7 @@ Body:
    Phone: +56912345678
    Industry Category: 5.- DISTRIBUCIÓN
    Onboarding Status: Pendiente
-   ```
+   \`\`\`
 
 3. Guarda el registro
 4. El Flow debería ejecutarse automáticamente y:
@@ -238,9 +238,9 @@ Estos son los campos que se prellenan automáticamente desde Zoho CRM:
 
 ### Ejemplo de URL generada:
 
-```
+\`\`\`
 https://tu-app.com/?token=02a4b3c8d9e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0...
-```
+\`\`\`
 
 La información dentro del token está completamente encriptada.
 
@@ -254,12 +254,12 @@ Puedes agregar un botón personalizado en cada Account para generar el link manu
 
 1. Ve a **Setup → Modules and Fields → Accounts → Links & Buttons**
 2. Crea un nuevo botón:
-   ```
+   \`\`\`
    Label: Generar Link de Onboarding
    Type: Web Service
    URL: [URL del Flow de Zoho]
    Display: Detail Page
-   ```
+   \`\`\`
 
 ### Dashboard para Seguimiento
 
