@@ -2,13 +2,10 @@ import { createClient } from "@supabase/supabase-js"
 import * as XLSX from "xlsx"
 import ExcelJS from "exceljs"
 import path from "path"
-import fs from "fs"
 import { NextResponse } from "next/server"
 
 const STORAGE_BUCKET = "onboarding-excels"
 const SIGNED_URL_TTL_SECONDS = 30 * 24 * 60 * 60
-
-const ONBOARDING_ID = "47cc61fe-98da-4b24-8307-0cc7f769fb72"
 
 const sanitizeRut = (rut: string) => (rut || "sin-rut").replace(/\./g, "").replace(/-/g, "").trim() || "sin-rut"
 const normalizeRutForExcel = (rut: string) => (rut || "").replace(/[^0-9A-Za-z]/g, "").toUpperCase()
@@ -250,8 +247,18 @@ async function buildPlanificacionWorkbook(datos: any) {
   return wb
 }
 
-export async function GET() {
+export async function POST(request: Request) {
   try {
+    const body = await request.json()
+    const { token } = body
+
+    if (!token) {
+      return NextResponse.json({ 
+        error: "Token requerido", 
+        ejemplo: { token: "47cc61fe-98da-4b24-8307-0cc7f769fb72" }
+      }, { status: 400 })
+    }
+
     const supabaseUrl = process.env.SUPABASE_URL!
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
     const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
@@ -260,11 +267,11 @@ export async function GET() {
     const { data: record, error: fetchError } = await supabase
       .from("onboardings")
       .select("*")
-      .eq("id", ONBOARDING_ID)
+      .eq("id", token)
       .single()
 
     if (fetchError || !record) {
-      return NextResponse.json({ error: "Registro no encontrado", details: fetchError }, { status: 404 })
+      return NextResponse.json({ error: "Registro no encontrado", token, details: fetchError }, { status: 404 })
     }
 
     const datos = record.datos_actuales
@@ -324,11 +331,13 @@ export async function GET() {
         datos_actuales: mergedDatos,
         fecha_ultima_actualizacion: new Date().toISOString(),
       })
-      .eq("id", ONBOARDING_ID)
+      .eq("id", token)
 
     return NextResponse.json({
       success: true,
+      token,
       empresa: empresa.razonSocial,
+      rut: empresa.rut,
       admins: Array.isArray(datos.admins) ? datos.admins.length : 0,
       trabajadores: Array.isArray(datos.trabajadores) ? datos.trabajadores.length : 0,
       urlUsuarios,
@@ -339,4 +348,16 @@ export async function GET() {
   } catch (error: any) {
     return NextResponse.json({ error: error.message, stack: error.stack }, { status: 500 })
   }
+}
+
+export async function GET() {
+  return NextResponse.json({
+    message: "API para regenerar Excel de onboarding",
+    metodo: "POST",
+    endpoint: "/api/regenerate-excel",
+    body: {
+      token: "UUID del onboarding (ej: 47cc61fe-98da-4b24-8307-0cc7f769fb72)"
+    },
+    ejemplo_curl: `curl -X POST https://tu-dominio.vercel.app/api/regenerate-excel -H "Content-Type: application/json" -d '{"token":"47cc61fe-98da-4b24-8307-0cc7f769fb72"}'`
+  })
 }
