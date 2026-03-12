@@ -8,7 +8,7 @@ import { NextResponse } from "next/server"
 const STORAGE_BUCKET = "onboarding-excels"
 const SIGNED_URL_TTL_SECONDS = 30 * 24 * 60 * 60
 
-const ONBOARDING_ID = "40a93587-1ab3-4fd0-906e-8f2fcaeaf21c"
+const ONBOARDING_ID = "47cc61fe-98da-4b24-8307-0cc7f769fb72"
 
 const sanitizeRut = (rut: string) => (rut || "sin-rut").replace(/\./g, "").replace(/-/g, "").trim() || "sin-rut"
 const normalizeRutForExcel = (rut: string) => (rut || "").replace(/[^0-9A-Za-z]/g, "").toUpperCase()
