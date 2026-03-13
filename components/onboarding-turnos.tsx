@@ -139,6 +139,15 @@ const isValidPhone = (phone) => {
   return phoneRegex.test(phone.replace(/\s/g, ""))
 }
 
+const normalizeGroupName = (value: string = "") => {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+}
+
 const validateEmpresaFields = (empresa: any): { isValid: boolean; errors: string[] } => {
   const errors: string[] = []
 
@@ -1001,7 +1010,7 @@ const TrabajadoresStep = ({
     }
   }, [isFirstMount, grupos.length, trabajadores.length, setGrupos])
 
-  // CHANGE: Updated useEffect to use ensureGrupoByName and clear groups
+  // Procesa pegado masivo y crea/reutiliza grupos por nombre normalizado
   useEffect(() => {
     try {
       const lines = bulkText
@@ -1020,18 +1029,7 @@ const TrabajadoresStep = ({
       return
     }
 
-    console.log("[v0] === LIMPIANDO GRUPOS PREVIOS ===")
-    console.log("[v0] Grupos antes de limpiar:", grupos.length)
-
-    // setGrupos automáticamente actualiza formData.empresa.grupos desde el componente padre
-    setGrupos([])
-
-    // Resetear el contador de IDs de grupos para empezar desde cero
-    grupoIdCounter.current = Date.now()
-
-    console.log("[v0] Grupos limpiados. Contador de IDs reseteado a:", grupoIdCounter.current)
     setLocalFieldErrors({ byId: {}, global: [] })
-    // </CHANGE>
 
     console.log("[v0] === INICIO DE PARSEO DE EXCEL ===")
     console.log("[v0] Total de líneas detectadas:", lines.length)
@@ -1136,7 +1134,7 @@ const TrabajadoresStep = ({
 
       let grupoId = ""
       if (grupoNombre) {
-        const key = grupoNombre.trim().toLowerCase()
+        const key = normalizeGroupName(grupoNombre)
         if (nombreToId.has(key)) {
           grupoId = nombreToId.get(key)
           console.log(`[v0] Grupo existente reutilizado: "${grupoNombre}" -> ID: ${grupoId}`)
@@ -1199,30 +1197,74 @@ const TrabajadoresStep = ({
       })
       setLocalFieldErrors({ byId: {}, global: ["Ocurrió un error al procesar la carga masiva. Reintenta."] })
     }
-  }, [bulkText, setBulkText, trabajadores, setTrabajadores, ensureGrupoByName, grupos, setGrupos, isCallSelected]) // Added ensureGrupoByName to dependency array
+  }, [bulkText, setBulkText, trabajadores, setTrabajadores, ensureGrupoByName, grupos, setGrupos, isCallSelected])
 
   const updateTrabajador = (id, field, value) => {
     const updated = trabajadores.map((t) => {
       if (t.id !== id) return t
+
       if (field === "grupoId") {
-        const grupo = grupos.find((g) => g.id === Number(value))
-        return { ...t, grupoId: value, grupoNombre: grupo?.nombre || "" }
+        const grupo = grupos.find((g) => String(g.id) === String(value))
+        return { ...t, grupoId: value ? String(value) : "", grupoNombre: grupo?.nombre || "" }
       }
+
+      if (field === "grupoNombre") {
+        const grupoTexto = String(value || "")
+        const existingGrupo = grupos.find((g) => normalizeGroupName(g.nombre) === normalizeGroupName(grupoTexto))
+        return {
+          ...t,
+          grupoNombre: grupoTexto,
+          grupoId: existingGrupo ? String(existingGrupo.id) : "",
+        }
+      }
+
       return { ...t, [field]: value }
     })
     setTrabajadores(updated)
 
-    if (localFieldErrors?.byId?.[id]?.[field]) {
-      // errors is undeclared, this needs to be fixed.
+    const errorField = field === "grupoNombre" ? "grupoId" : field
+    if (localFieldErrors?.byId?.[id]?.[errorField]) {
       const newById = { ...(localFieldErrors.byId || {}) }
       const row = { ...(newById[id] || {}) }
-      delete row[field]
+      delete row[errorField]
       if (Object.keys(row).length === 0) {
         delete newById[id]
       } else {
         newById[id] = row
       }
-      setLocalFieldErrors({ ...(localFieldErrors || { byId: {}, global: [] }), byId: newById }) // setErrors is undeclared, this needs to be fixed.
+      setLocalFieldErrors({ ...(localFieldErrors || { byId: {}, global: [] }), byId: newById })
+    }
+  }
+
+  const commitTrabajadorGrupo = (id) => {
+    const trabajador = trabajadores.find((t) => t.id === id)
+    if (!trabajador) return
+
+    const grupoDesdeId = grupos.find((g) => String(g.id) === String(trabajador.grupoId))
+    const grupoIngresado = trabajador.grupoNombre?.trim() || grupoDesdeId?.nombre?.trim() || ""
+    if (!grupoIngresado) {
+      updateTrabajador(id, "grupoId", "")
+      return
+    }
+
+    const existingGrupo = grupos.find((g) => normalizeGroupName(g.nombre) === normalizeGroupName(grupoIngresado))
+    const grupoIdFinal = existingGrupo ? String(existingGrupo.id) : ensureGrupoByName(grupoIngresado)
+    const grupoNombreFinal = existingGrupo?.nombre || grupoIngresado
+
+    setTrabajadores((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, grupoId: grupoIdFinal, grupoNombre: grupoNombreFinal } : t)),
+    )
+
+    if (localFieldErrors?.byId?.[id]?.grupoId) {
+      const newById = { ...(localFieldErrors.byId || {}) }
+      const row = { ...(newById[id] || {}) }
+      delete row.grupoId
+      if (Object.keys(row).length === 0) {
+        delete newById[id]
+      } else {
+        newById[id] = row
+      }
+      setLocalFieldErrors({ ...(localFieldErrors || { byId: {}, global: [] }), byId: newById })
     }
   }
 
@@ -1500,6 +1542,12 @@ const TrabajadoresStep = ({
         </div>
       </div>
 
+      <datalist id="grupos-existentes">
+        {grupos.map((g) => (
+          <option key={g.id} value={g.nombre} />
+        ))}
+      </datalist>
+
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="min-w-full border-collapse text-xs">
           <thead className="bg-slate-50">
@@ -1618,21 +1666,18 @@ const TrabajadoresStep = ({
                     {rowErrors.correo && <p className="mt-0.5 text-[10px] text-red-600">{rowErrors.correo}</p>}
                   </td>
                   <td className="px-3 py-1.5">
-                    <select
+                    <input
+                      list="grupos-existentes"
                       className={`w-full rounded-lg border px-2 py-1 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 ${
                         rowErrors.grupoId ? "border-red-400" : "border-slate-200"
                       } ${isAdmin ? "bg-blue-50" : ""}`}
-                      value={t.grupoId}
-                      onChange={(e) => updateTrabajador(t.id, "grupoId", e.target.value ? Number(e.target.value) : "")}
+                      type="text"
+                      value={t.grupoNombre || grupos.find((g) => String(g.id) === String(t.grupoId))?.nombre || ""}
+                      onChange={(e) => updateTrabajador(t.id, "grupoNombre", e.target.value)}
+                      onBlur={() => commitTrabajadorGrupo(t.id)}
+                      placeholder="Ej: Operaciones"
                       disabled={isAdmin}
-                    >
-                      <option value="">Sin asignar</option>
-                      {grupos.map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.nombre}
-                        </option>
-                      ))}
-                    </select>
+                    />
                     {rowErrors.grupoId && <p className="mt-0.5 text-[10px] text-red-600">{rowErrors.grupoId}</p>}
                   </td>
                   <td className="px-3 py-1.5">
@@ -2711,7 +2756,7 @@ const AsignacionStep = ({ asignaciones, setAsignaciones, trabajadores, planifica
                 const grupo =
                   grupos.find((g) => g.id === Number(t.grupoId)) ||
                   (t.grupoNombre
-                    ? grupos.find((g) => g.nombre?.trim().toLowerCase() === t.grupoNombre?.trim().toLowerCase())
+                    ? grupos.find((g) => normalizeGroupName(g.nombre || "") === normalizeGroupName(t.grupoNombre || ""))
                     : undefined)
                 return (
                   <tr key={t.id} className="border-t border-slate-100">
@@ -3778,7 +3823,10 @@ function OnboardingTurnosCliente() {
   const ensureGrupoByName = useCallback(
     (grupoNombre: string): string => {
       const trimmedNombre = grupoNombre.trim()
-      const existingGrupo = grupos.find((g) => g.nombre.toLowerCase() === trimmedNombre.toLowerCase())
+      if (!trimmedNombre) return ""
+
+      const normalizedNombre = normalizeGroupName(trimmedNombre)
+      const existingGrupo = grupos.find((g) => normalizeGroupName(g.nombre) === normalizedNombre)
 
       if (existingGrupo) {
         console.log(`[v0] Grupo existente reutilizado: "${trimmedNombre}" -> ID: ${existingGrupo.id}`)

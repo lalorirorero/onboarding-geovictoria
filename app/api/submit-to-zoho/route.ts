@@ -42,6 +42,11 @@ const pickPhone = (trabajador: any, index: number) => {
   return ""
 }
 
+const resolveTrabajadorGrupo = (trabajador: any, grupos: any[] = []) => {
+  const grupoDesdeId = grupos.find((grupo: any) => String(grupo?.id) === String(trabajador?.grupoId))
+  return trabajador?.grupoNombre || trabajador?.grupo || grupoDesdeId?.nombre || ""
+}
+
 const setExcelCell = (
   sheet: ExcelJS.Worksheet,
   cellAddress: string,
@@ -67,6 +72,7 @@ const buildUsuariosWorkbook = (payload: ZohoPayload) => {
   ]
 
   const empresaRut = normalizeRutForExcel(payload.formData?.empresa?.rut)
+  const grupos = payload.formData?.empresa?.grupos || []
   const trabajadoresRows = (payload.formData?.trabajadores || []).map((trabajador: any) => {
     const { nombres, apellidos } = splitNombre(trabajador?.nombre)
     return [
@@ -75,7 +81,7 @@ const buildUsuariosWorkbook = (payload: ZohoPayload) => {
       "",
       nombres,
       apellidos,
-      trabajador?.grupoNombre || trabajador?.grupo || "",
+      resolveTrabajadorGrupo(trabajador, grupos),
       pickPhone(trabajador, 1),
       pickPhone(trabajador, 2),
       pickPhone(trabajador, 3),
@@ -139,6 +145,7 @@ const buildPlanificacionWorkbook = async (payload: ZohoPayload) => {
   const asignaciones = payload.formData?.asignaciones || []
   const trabajadores = payload.formData?.trabajadores || []
   const admins = payload.formData?.admins || []
+  const grupos = payload.formData?.empresa?.grupos || []
 
   const workerHeaderRowIndex = 25
   const adminBlockStartRow = 18
@@ -233,7 +240,7 @@ const buildPlanificacionWorkbook = async (payload: ZohoPayload) => {
   trabajadores.forEach((trabajador: any, index: number) => {
     const rowIndex = startRow + index
     const { nombres, apellidos } = splitNombre(trabajador?.nombre)
-    const grupo = trabajador?.grupoNombre || trabajador?.grupo || ""
+    const grupo = resolveTrabajadorGrupo(trabajador, grupos)
 
     const asignacion = findAsignacion(trabajador?.id)
     const plan = planificaciones.find((p: any) => String(p.id) === String(asignacion?.planificacionId))
