@@ -59,6 +59,9 @@ export async function POST(request: NextRequest) {
         ejecutivoTelefono: body.empresa?.ejecutivoTelefono || body.empresaData?.ejecutivoTelefono || "",
         ejecutivoNombre: body.empresa?.ejecutivoNombre || body.empresaData?.ejecutivoNombre || "",
         sistema: body.empresa?.sistema || body.empresaData?.sistema || [],
+        modulosAdicionales: body.empresa?.modulosAdicionales || body.empresaData?.modulosAdicionales || [],
+        modulosAdicionalesOtro:
+          body.empresa?.modulosAdicionalesOtro || body.empresaData?.modulosAdicionalesOtro || "",
         rubro: body.empresa?.rubro || body.empresaData?.rubro || "",
         grupos: [],
         id_zoho: id_zoho,

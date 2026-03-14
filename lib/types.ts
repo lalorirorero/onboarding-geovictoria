@@ -8,6 +8,8 @@ export interface Empresa {
   emailFacturacion: string
   telefonoContacto: string
   sistema: string[]
+  modulosAdicionales: string[]
+  modulosAdicionalesOtro: string
   rubro: string
   grupos: Grupo[]
 }

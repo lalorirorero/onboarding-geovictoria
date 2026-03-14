@@ -148,6 +148,27 @@ const normalizeGroupName = (value: string = "") => {
     .toLowerCase()
 }
 
+const MODULO_DASHBOARD_BI = "Dashboard BI"
+const MODULO_DASHBOARD_BI_LEGACY = "Dasboard BI"
+
+const normalizeModuloAdicional = (value: string = "") => {
+  const normalized = value.trim()
+  if (!normalized) return ""
+  return normalized === MODULO_DASHBOARD_BI_LEGACY ? MODULO_DASHBOARD_BI : normalized
+}
+
+const normalizeModulosAdicionales = (values?: string[]) => {
+  const normalizedValues = Array.isArray(values)
+    ? values.map((value) => normalizeModuloAdicional(value || "")).filter((value) => value.length > 0)
+    : []
+  return Array.from(new Set(normalizedValues))
+}
+
+const normalizeEmpresaModulos = (empresa: any = {}) => ({
+  ...empresa,
+  modulosAdicionales: normalizeModulosAdicionales(empresa?.modulosAdicionales),
+})
+
 const validateEmpresaFields = (empresa: any): { isValid: boolean; errors: string[] } => {
   const errors: string[] = []
 
@@ -166,7 +187,12 @@ const validateEmpresaFields = (empresa: any): { isValid: boolean; errors: string
   if (!empresa.emailFacturacion?.trim()) errors.push("Email de facturación")
   if (!empresa.telefonoContacto?.trim()) errors.push("Teléfono de contacto")
   if (!empresa.rubro?.trim()) errors.push("Rubro")
-  if (!empresa.sistema || empresa.sistema.length === 0) errors.push("Sistema")
+  if (!empresa.sistema || empresa.sistema.length === 0) errors.push("Sistema de marcaje")
+  if (Array.isArray(empresa.modulosAdicionales) && empresa.modulosAdicionales.includes("Otro")) {
+    if (!empresa.modulosAdicionalesOtro?.trim()) {
+      errors.push("Modulos adicionales (Otro)")
+    }
+  }
 
   // Validación de email
   if (empresa.emailFacturacion?.trim()) {
@@ -660,6 +686,141 @@ const EmpresaStep = React.memo<{
     },
   }
 
+  const MODULOS_ADICIONALES = [
+    MODULO_DASHBOARD_BI,
+    "Gestor Documental",
+    "Planificador Inteligente",
+    "Modulo de Alertas",
+    "Permisos y Vacaciones",
+    "Otro",
+  ]
+
+  const MODULOS_ADICIONALES_INFO: Record<
+    string,
+    {
+      titulo: string
+      categoria: string
+      disponibilidad: string
+      costo: string
+      resumen: [string, string]
+      descripcion: string
+      incluye: string[]
+    }
+  > = {
+    [MODULO_DASHBOARD_BI]: {
+      titulo: "Dashboard BI",
+      categoria: "Asistencia",
+      disponibilidad: "Disponible",
+      costo: "Costo adicional",
+      resumen: [
+        "Visualiza indicadores de asistencia y horas extra.",
+        "Detecta tendencias para mejorar decisiones.",
+      ],
+      descripcion:
+        "Visualiza y analiza los datos clave de asistencia, ausentismo y horas trabajadas desde una sola plataforma. Automatiza la generacion de indicadores, identifica tendencias operativas y mejora tu rentabilidad gracias a datos precisos y en tiempo real.",
+      incluye: [
+        "Graficos evolutivos sobre atrasos, horas extras y cumplimiento de jornada.",
+        "Analisis de origen de horas extras y motivos mas frecuentes de permisos, por dia y por area.",
+        "Personalizacion de indicadores y datos para reflejar las necesidades y KPI propios de cada empresa.",
+      ],
+    },
+    "Gestor Documental": {
+      titulo: "Gestor Documental",
+      categoria: "Asistencia",
+      disponibilidad: "Disponible",
+      costo: "Costo adicional",
+      resumen: [
+        "Crea, envia y firma documentos laborales digitales.",
+        "Controla pendientes y envia recordatorios.",
+      ],
+      descripcion:
+        "Evita tener carpetas con papeles por anos guardados y perseguir fisicamente a tus trabajadores con el nuevo Gestor Documental de GeoVictoria. Facilita la administracion y firma de anexos, pactos y notificaciones para asegurar resguardo de documentos legales.",
+      incluye: [
+        "Crear documentos laborales propios, guardarlos como plantillas y enviarlos por correo a los trabajadores con pocos clics.",
+        "Usar campos de los usuarios para autocompletar nombres, cargos y otras caracteristicas.",
+        "Revisar que trabajadores aun no han firmado para enviarles un recordatorio.",
+      ],
+    },
+    "Planificador Inteligente": {
+      titulo: "Calendario Inteligente",
+      categoria: "Asistencia",
+      disponibilidad: "Beta",
+      costo: "Costo adicional",
+      resumen: [
+        "Organiza turnos y ausencias en una sola vista.",
+        "Ajusta dotacion rapido ante cambios operativos.",
+      ],
+      descripcion:
+        "Con el Planificador Inteligente de GeoVictoria podras visualizar tu dotacion completa, asignar y modificar turnos en pocos clics, y anticiparte a cualquier incumplimiento operativo antes de que afecte el servicio. Todo en una sola plataforma, con control total y trazabilidad.",
+      incluye: [
+        "Revisar turnos y ausencias planificadas para tener claridad de la dotacion disponible.",
+        "Asignar y modificar turnos de forma agil, adaptandose a cambios operativos.",
+        "Crear y asignar planificadores para delegar y organizar la gestion.",
+        "Gestionar alertas de incumplimiento operacional y actuar antes de que impacten el servicio.",
+      ],
+    },
+    "Modulo de Alertas": {
+      titulo: "Alertas",
+      categoria: "Asistencia",
+      disponibilidad: "Alta",
+      costo: "Costo adicional",
+      resumen: [
+        "Recibe alertas de atrasos, inasistencias y horas extra.",
+        "Actua a tiempo con notificaciones automaticas.",
+      ],
+      descripcion:
+        "Anticipate a los problemas y toma decisiones rapidas con alertas inteligentes. Detecta atrasos, inasistencias o exceso de horas extras y recibe notificaciones automaticas por email.",
+      incluye: [
+        "Deteccion automatica de atrasos, inasistencias y exceso de horas extras.",
+        "Notificaciones por email para actuar rapidamente frente a incumplimientos.",
+        "Mayor control operativo para reducir costos y mejorar la gestion del equipo.",
+      ],
+    },
+    "Permisos y Vacaciones": {
+      titulo: "Permisos y Vacaciones",
+      categoria: "Asistencia",
+      disponibilidad: "Beta",
+      costo: "Costo adicional",
+      resumen: [
+        "Gestiona permisos y vacaciones en linea.",
+        "Cada colaborador ve su saldo en tiempo real.",
+      ],
+      descripcion:
+        "Gestiona permisos y vacaciones de forma simple y automatica desde GeoVictoria. Tus equipos pueden solicitar, aprobar y visualizar sus dias disponibles en tiempo real, evitando demoras o correos interminables. Todo queda trazado, ordenado y sin errores de calculo.",
+      incluye: [
+        "Flujo de aprobacion en linea para vacaciones y permisos, con trazabilidad completa.",
+        "Bolsa de vacaciones para que cada trabajador pueda ver en tiempo real sus dias disponibles.",
+        "Solicitudes mas rapidas y simples, sin papeleo ni procesos manuales.",
+      ],
+    },
+    Otro: {
+      titulo: "Buscas otro modulo?",
+      categoria: "Personalizado",
+      disponibilidad: "Lo revisamos contigo",
+      costo: "Cotizable",
+      resumen: [
+        "No ves el modulo que necesitas en el listado?",
+        "Cuentanos cual buscas y te asesoramos.",
+      ],
+      descripcion:
+        "Si no encuentras el modulo que necesitas, selecciona esta opcion y cuentanos cual te gustaria implementar. Nuestro equipo comercial y tecnico revisara tu caso para proponerte la mejor alternativa.",
+      incluye: [
+        "Solicita un modulo que no aparece en el listado.",
+        "Completa el nombre del modulo que quieres cotizar.",
+        "Recibe evaluacion comercial y tecnica personalizada.",
+      ],
+    },
+  }
+
+  const MODULOS_ADICIONALES_ICONOS: Record<string, React.ComponentType<{ className?: string }>> = {
+    [MODULO_DASHBOARD_BI]: TrendingUp,
+    "Gestor Documental": Shield,
+    "Planificador Inteligente": Clock,
+    "Modulo de Alertas": AlertCircle,
+    "Permisos y Vacaciones": Heart,
+    Otro: Rocket,
+  }
+
   const RUBROS = [
     "1. Agrícola",
     "2. Condominio",
@@ -717,15 +878,94 @@ const EmpresaStep = React.memo<{
     [setEmpresa, isFieldPrefilled, trackFieldChange],
   )
 
+  const handleModuloAdicionalChange = useCallback(
+    (moduloValue: string) => {
+      setEmpresa((prev) => {
+        const currentModulos = normalizeModulosAdicionales(prev.modulosAdicionales)
+        const normalizedModulo = normalizeModuloAdicional(moduloValue)
+        const isSelected = currentModulos.includes(normalizedModulo)
+
+        const newModulos = isSelected
+          ? currentModulos.filter((m) => m !== normalizedModulo)
+          : [...currentModulos, normalizedModulo]
+
+        const shouldClearOtro = !newModulos.includes("Otro")
+
+        if (isFieldPrefilled("empresa.modulosAdicionales")) {
+          trackFieldChange("empresa.modulosAdicionales", newModulos)
+        }
+
+        if (shouldClearOtro && isFieldPrefilled("empresa.modulosAdicionalesOtro")) {
+          trackFieldChange("empresa.modulosAdicionalesOtro", "")
+        }
+
+        return {
+          ...prev,
+          modulosAdicionales: newModulos,
+          modulosAdicionalesOtro: shouldClearOtro ? "" : prev.modulosAdicionalesOtro || "",
+        }
+      })
+    },
+    [setEmpresa, isFieldPrefilled, trackFieldChange],
+  )
+
+  const ejecutivoWhatsapp = normalizeWhatsappNumber(empresa.ejecutivoTelefono)
+  const empresaConsulta = empresa.nombreFantasia?.trim() || empresa.razonSocial?.trim() || "mi empresa"
+  const ejecutivoConsulta = empresa.ejecutivoNombre?.trim() || "tu ejecutivo comercial"
+
+  const getModuloWhatsAppLink = useCallback(
+    (moduloKey: string, moduloPersonalizado?: string) => {
+      if (!ejecutivoWhatsapp) return ""
+
+      const saludo = `Hola ${ejecutivoConsulta}, soy de la empresa ${empresaConsulta}. Te escribo mientras estoy completando nuestro onboarding.`
+
+      const mensajesPorModulo: Record<string, string> = {
+        [MODULO_DASHBOARD_BI]:
+          `${saludo} Quiero consultar el precio del modulo Dashboard BI y sus planes disponibles.`,
+        "Gestor Documental":
+          `${saludo} Quiero consultar el precio del modulo Gestor Documental y que incluye.`,
+        "Planificador Inteligente":
+          `${saludo} Quiero consultar el precio del modulo Planificador Inteligente y su alcance de implementacion.`,
+        "Modulo de Alertas":
+          `${saludo} Quiero consultar el precio del modulo de Alertas y como se habilita.`,
+        "Permisos y Vacaciones":
+          `${saludo} Quiero consultar el precio del modulo Permisos y Vacaciones y sus condiciones.`,
+      }
+
+      let text = mensajesPorModulo[moduloKey]
+
+      if (moduloKey === "Otro") {
+        const nombreModulo = moduloPersonalizado || "modulo personalizado"
+        text = `${saludo} Quiero consultar el precio de un modulo no listado: ${nombreModulo}.`
+      }
+
+      if (moduloKey === "modulos adicionales") {
+        text = `${saludo} Quiero cotizar modulos adicionales para potenciar nuestra implementacion.`
+      }
+
+      if (!text) {
+        const fallbackModulo = moduloPersonalizado || moduloKey || "modulo adicional"
+        text = `${saludo} Quiero consultar el precio del modulo ${fallbackModulo}.`
+      }
+
+      return `https://wa.me/${ejecutivoWhatsapp}?text=${encodeURIComponent(text)}`
+    },
+    [ejecutivoWhatsapp, ejecutivoConsulta, empresaConsulta],
+  )
+
+  const selectedModulos = normalizeModulosAdicionales(empresa.modulosAdicionales)
+
+
   return (
     <section className="space-y-6">
-      <header>
-        <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-          <Building2 className="h-5 w-5 text-sky-500" />
-          Datos de la empresa
-        </h2>
-        <p className="mt-2 text-sm text-slate-500">Todos los campos son obligatorios.</p>
-      </header>
+      <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <header className="mb-4 border-b border-slate-100 pb-3">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
+            <Building2 className="h-4 w-4 text-sky-500" />
+            Datos de la empresa
+          </h3>
+          <p className="mt-1 text-sm text-slate-500">Completa la informacion base para continuar el onboarding.</p>
+        </header>
 
       <div className="grid gap-6 md:grid-cols-2">
         <ProtectedInput
@@ -818,8 +1058,17 @@ const EmpresaStep = React.memo<{
         </select>
         {fieldErrors["empresa.rubro"] && <p className="mt-1 text-sm text-red-600">{fieldErrors["empresa.rubro"]}</p>}
       </div>
+      </article>
 
-      <div>
+      <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <header className="mb-4 border-b border-slate-100 pb-3">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
+            <Clock className="h-4 w-4 text-sky-500" />
+            Sistema de marcaje
+          </h3>
+          <p className="mt-1 text-sm text-slate-500">Selecciona el o los metodos que usara la empresa para marcar.</p>
+        </header>
+
         <label className="block text-sm font-medium text-slate-700 mb-3">
           Sistema de marcaje <span className="text-slate-900">*</span>
         </label>
@@ -868,7 +1117,163 @@ const EmpresaStep = React.memo<{
             </p>
           </div>
         )}
-      </div>
+      </article>
+
+      <article id="modulos-adicionales-section" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <header className="mb-4 border-b border-slate-100 pb-3">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
+            <Rocket className="h-4 w-4 text-sky-500" />
+            Modulos adicionales
+          </h3>
+          <p className="mt-1 text-sm text-slate-500">Opcional: selecciona modulos para potenciar la implementacion.</p>
+        </header>
+        <div
+          className={`mb-3 rounded-xl border p-3 ${
+            (empresa.modulosAdicionales || []).length === 0 ? "border-amber-200 bg-amber-50" : "border-sky-200 bg-sky-50"
+          }`}
+        >
+          <div className="flex items-start gap-2">
+            <Rocket
+              className={`mt-0.5 h-4 w-4 ${
+                (empresa.modulosAdicionales || []).length === 0 ? "text-amber-600" : "text-sky-600"
+              }`}
+            />
+            <div className="space-y-1 text-sm text-slate-700">
+              <p className="font-semibold text-slate-900">Potencia tu implementacion con modulos adicionales</p>
+              <p>Selecciona los modulos que te interesan y te ayudamos a cotizar una solucion a tu medida.</p>
+              <p>Si no encuentras el que necesitas, marca "Otro" y cuentanos cual te gustaria incorporar.</p>
+              <p className="font-medium text-slate-800">El precio se consulta directo por WhatsApp con tu ejecutivo.</p>
+              {ejecutivoWhatsapp && (
+                <a
+                  href={getModuloWhatsAppLink("modulos adicionales")}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                >
+                  <WhatsAppIcon className="h-3.5 w-3.5" />
+                  Consultar precio con mi ejecutivo
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {MODULOS_ADICIONALES.map((modulo) => {
+            const isSelected = selectedModulos.includes(modulo)
+            const detalle = MODULOS_ADICIONALES_INFO[modulo]
+            const ModuloIcon = MODULOS_ADICIONALES_ICONOS[modulo] || Zap
+
+            return (
+              <button
+                key={modulo}
+                type="button"
+                onClick={() => handleModuloAdicionalChange(modulo)}
+                className={`rounded-xl border-2 p-4 text-left transition-all ${
+                  isSelected ? "border-sky-500 bg-sky-50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-lg border ${
+                      isSelected ? "border-sky-500 bg-white text-sky-600" : "border-slate-200 bg-slate-50 text-slate-500"
+                    }`}
+                  >
+                    <ModuloIcon className="h-4 w-4" />
+                  </div>
+                  <div
+                    className={`flex h-5 w-5 items-center justify-center rounded border-2 ${
+                      isSelected ? "border-sky-500 bg-sky-500" : "border-slate-300"
+                    }`}
+                  >
+                    {isSelected && <Check className="h-3 w-3 text-white" />}
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <p className="font-semibold text-slate-800">{modulo}</p>
+                  {detalle && (
+                    <p className="mt-1 text-xs leading-5 text-slate-600">
+                      <span className="block">{detalle.resumen[0]}</span>
+                      <span className="block">{detalle.resumen[1]}</span>
+                    </p>
+                  )}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+        {selectedModulos.length === 0 && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Aun no seleccionas modulos adicionales. Elige uno para ver beneficios y funcionalidades.
+          </div>
+        )}
+
+        {selectedModulos
+          .filter((modulo) => MODULOS_ADICIONALES_INFO[modulo])
+          .map((modulo) => {
+            const detalle = MODULOS_ADICIONALES_INFO[modulo]
+            const consultaNombre =
+              modulo === "Otro" ? empresa.modulosAdicionalesOtro?.trim() || "modulo personalizado" : detalle.titulo
+            const moduloWhatsAppLink = getModuloWhatsAppLink(modulo, consultaNombre)
+            return (
+              <article key={`detalle-${modulo}`} className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h4 className="text-base font-semibold text-slate-900">{detalle.titulo}</h4>
+                  <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-medium text-sky-700">
+                    {detalle.categoria}
+                  </span>
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700">
+                    {detalle.disponibilidad}
+                  </span>
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700">
+                    {detalle.costo}
+                  </span>
+                </div>
+
+                <p className="mt-3 text-sm leading-relaxed text-slate-700">{detalle.descripcion}</p>
+
+                {moduloWhatsAppLink ? (
+                  <a
+                    href={moduloWhatsAppLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700"
+                  >
+                    <WhatsAppIcon className="h-3.5 w-3.5" />
+                    Consultar precio con mi ejecutivo
+                  </a>
+                ) : (
+                  <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    Para consultar precio por WhatsApp necesitas un ejecutivo asignado en esta sesion.
+                  </div>
+                )}
+
+                <p className="mt-4 text-sm font-semibold text-slate-800">{modulo === "Otro" ? "Como funciona" : "Incluye:"}</p>
+                <ul className="mt-2 space-y-2 rounded-lg bg-white p-3 text-sm text-slate-700">
+                  {detalle.incluye.map((item) => (
+                    <li key={item} className="flex items-start gap-2">
+                      <span className="mt-1 h-2 w-2 rounded-full bg-sky-500" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            )
+          })}
+
+        {selectedModulos.includes("Otro") && (
+          <div className="mt-3">
+            <ProtectedInput
+              name="modulosAdicionalesOtro"
+              label="Que modulo te gustaria agregar?"
+              placeholder="Ej: Control de accesos avanzado"
+              value={empresa.modulosAdicionalesOtro || ""}
+              onChange={handleEmpresaChange}
+              error={fieldErrors["empresa.modulosAdicionalesOtro"]}
+            />
+          </div>
+        )}
+      </article>
     </section>
   )
 })
@@ -3364,6 +3769,10 @@ const AntesDeComenzarStep = ({ onContinue, onBack }: { onContinue: () => void; o
                 <span className="font-medium text-slate-700">Turnos y planificaciones:</span> solo si decides
                 configurarlos ahora.
               </li>
+              <li>
+                <span className="font-medium text-slate-700">Modulos adicionales:</span> puedes seleccionarlos en el
+                paso Empresa para potenciar tu implementacion. El precio se consulta por WhatsApp con tu ejecutivo.
+              </li>
             </ul>
           </div>
         </div>
@@ -3448,6 +3857,8 @@ type Empresa = {
   ejecutivoTelefono?: string
   ejecutivoNombre?: string
   sistema: string[]
+  modulosAdicionales: string[]
+  modulosAdicionalesOtro: string
   rubro: string
   grupos: { id: number; nombre: string; descripcion: string }[]
   id_zoho: string | null
@@ -3538,6 +3949,8 @@ function getEmptyEmpresa(): Empresa {
     ejecutivoTelefono: "",
     ejecutivoNombre: "",
     sistema: [],
+    modulosAdicionales: [],
+    modulosAdicionalesOtro: "",
     rubro: "",
     grupos: [],
     id_zoho: null,
@@ -3545,6 +3958,15 @@ function getEmptyEmpresa(): Empresa {
 }
 
 const normalizeWhatsappNumber = (value?: string) => (value || "").replace(/\D/g, "")
+
+const WhatsAppIcon = ({ className = "h-3.5 w-3.5" }: { className?: string }) => (
+  <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
+    <path
+      fill="currentColor"
+      d="M16 3C9.4 3 4 8.4 4 15c0 2.3.7 4.6 2 6.6L4 29l7.7-2c1.9 1 4 1.5 6.3 1.5 6.6 0 12-5.4 12-12S22.6 3 16 3zm0 22.1c-2 0-3.9-.6-5.6-1.7l-.4-.2-4.6 1.2 1.2-4.5-.3-.5C5.4 18 5 16.5 5 15c0-6.1 4.9-11 11-11s11 4.9 11 11-4.9 11.1-11 11.1zm6-8.3c-.3-.2-1.8-.9-2.1-1s-.5-.2-.7.2-.8 1-.9 1.2-.4.3-.7.1c-.3-.2-1.3-.5-2.5-1.6-.9-.8-1.6-1.9-1.8-2.2-.2-.3 0-.5.1-.7.1-.1.3-.4.4-.5.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5s-.7-1.8-1-2.4c-.3-.7-.6-.6-.7-.6h-.6c-.2 0-.5.1-.7.3s-1 1-1 2.5 1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5 4.5.7.3 1.2.5 1.6.6.7.2 1.3.2 1.8.1.6-.1 1.8-.7 2-1.3.2-.6.2-1.1.1-1.2-.1-.1-.3-.2-.6-.4z"
+    />
+  </svg>
+)
 
 const WhatsAppFloatingButton = ({
   phone,
@@ -3730,6 +4152,8 @@ function OnboardingTurnosCliente() {
   const [telefonoCallConfirmChecked, setTelefonoCallConfirmChecked] = useState(false)
   const skipCallPhoneCheckRef = useRef(false)
   const telefonoCallDeferredRef = useRef(false)
+  const [showModulosUpsellModal, setShowModulosUpsellModal] = useState(false)
+  const skipModulosUpsellRef = useRef(false)
 
   const [isInitialized, setIsInitialized] = useState(false)
 
@@ -3911,6 +4335,7 @@ function OnboardingTurnosCliente() {
               // Ensure default turns are present if not in loaded data
               loadedFormData = {
                 ...result.formData,
+                empresa: normalizeEmpresaModulos(result.formData.empresa || getEmptyEmpresa()),
                 turnos: result.formData.turnos?.length ? result.formData.turnos : DEFAULT_TURNOS,
               }
               setFormData(loadedFormData)
@@ -4055,7 +4480,7 @@ function OnboardingTurnosCliente() {
         ...formData,
         trabajadores: trabajadores, // Sync trabajadores from state
         empresa: {
-          ...formData.empresa,
+          ...normalizeEmpresaModulos(formData.empresa),
           grupos: grupos, // Sync grupos from state
         },
       }
@@ -4214,6 +4639,8 @@ function OnboardingTurnosCliente() {
             if (err.includes("Rubro")) stepErrors["empresa.rubro"] = "Este campo es obligatorio"
             if (err.includes("Sistema"))
               stepErrors["empresa.sistema"] = "Debes seleccionar al menos un sistema de marcaje"
+            if (err.includes("Modulos adicionales (Otro)"))
+              stepErrors["empresa.modulosAdicionalesOtro"] = "Debes especificar el modulo en Otro"
             if (err.includes("Email de facturación (formato inválido)")) {
               stepErrors["empresa.emailFacturacion"] = "Formato de email inválido (ej: correo@empresa.cl)"
             } else if (err.includes("Email de facturación")) {
@@ -4343,6 +4770,14 @@ function OnboardingTurnosCliente() {
     setValidationErrors([])
     setFieldErrors({})
     setNoAdminsError(false)
+
+    const hasSelectedModulos =
+      Array.isArray(formData.empresa.modulosAdicionales) && formData.empresa.modulosAdicionales.length > 0
+    if (currentStep === 2 && !hasSelectedModulos && !skipModulosUpsellRef.current) {
+      setShowModulosUpsellModal(true)
+      return
+    }
+    skipModulosUpsellRef.current = false
     // </CHANGE>
 
     setIsSubmitting(true)
@@ -4361,7 +4796,7 @@ function OnboardingTurnosCliente() {
           telefonoCallDeferred,
           trabajadores: trabajadores, // Sync trabajadores from state
           empresa: {
-            ...formData.empresa,
+            ...normalizeEmpresaModulos(formData.empresa),
             grupos: grupos, // Sync grupos from state
           },
         }
@@ -4486,6 +4921,7 @@ function OnboardingTurnosCliente() {
     isFieldEdited, // Added to dependencies
     setEmpresa, // Added to dependencies
     setFormData,
+    setShowModulosUpsellModal,
     setShowTelefonoCallModal,
     setTelefonoCallMissingCount,
     setTelefonoCallConfirmChecked,
@@ -4792,6 +5228,12 @@ function OnboardingTurnosCliente() {
                   <strong>Sistema(s):</strong> {formData.empresa.sistema.join(", ") || "No seleccionado"}
                 </p>
                 <p>
+                  <strong>Modulos adicionales:</strong> {formData.empresa.modulosAdicionales?.join(", ") || "No seleccionado"}
+                  {formData.empresa.modulosAdicionales?.includes("Otro") && formData.empresa.modulosAdicionalesOtro
+                    ? ` (Otro: ${formData.empresa.modulosAdicionalesOtro})`
+                    : ""}
+                </p>
+                <p>
                   <strong>Rubro:</strong> {formData.empresa.rubro || "No seleccionado"}
                 </p>
               </div>
@@ -4940,7 +5382,11 @@ function OnboardingTurnosCliente() {
   // CHANGE: Added async to handleWorkersDecision and handleConfigurationDecision
   const handleWorkersDecision = async (decision: "now" | "later") => {
     const loadNow = decision === "now"
-    const updatedFormData = { ...formData, loadWorkersNow: loadNow }
+    const updatedFormData = {
+      ...formData,
+      loadWorkersNow: loadNow,
+      empresa: normalizeEmpresaModulos(formData.empresa),
+    }
     setFormData(updatedFormData)
 
     // Determinar el siguiente paso
@@ -5034,7 +5480,11 @@ function OnboardingTurnosCliente() {
 
   const handleConfigurationDecision = async (decision: "now" | "later") => {
     const configureNow = decision === "now"
-    const updatedFormData = { ...formData, configureNow: configureNow }
+    const updatedFormData = {
+      ...formData,
+      configureNow: configureNow,
+      empresa: normalizeEmpresaModulos(formData.empresa),
+    }
     setFormData(updatedFormData)
 
     // Determinar el siguiente paso
@@ -5214,6 +5664,74 @@ function OnboardingTurnosCliente() {
               }}
             >
               Continuar sin teléfonos
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showModulosUpsellModal} onOpenChange={setShowModulosUpsellModal}>
+        <DialogContent className="sm:max-w-xl overflow-hidden">
+          <DialogHeader className="-mx-6 -mt-6 border-b border-sky-100 bg-gradient-to-r from-sky-50 via-cyan-50 to-emerald-50 px-6 py-5">
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-medium text-sky-700">
+              <Rocket className="h-3.5 w-3.5" />
+              Recomendado para potenciar resultados
+            </div>
+            <DialogTitle className="mt-3 text-2xl leading-tight text-slate-900">
+              Dale mas valor a tu implementacion desde el dia 1
+            </DialogTitle>
+            <DialogDescription className="mt-1 text-sm text-slate-700">
+              Activa modulos adicionales y construye una solucion mas completa para tu operacion.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 pt-3 text-sm text-slate-700">
+            <p className="font-semibold text-slate-900">Que ganas al seleccionarlos ahora:</p>
+            <div className="space-y-2">
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-600" />
+                <p>Visualiza indicadores clave con Dashboard BI y toma decisiones mas rapidas.</p>
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-600" />
+                <p>Digitaliza procesos con Gestor Documental, Alertas y Permisos y Vacaciones.</p>
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-600" />
+                <p>Planifica mejor la dotacion con Planificador Inteligente.</p>
+              </div>
+            </div>
+            <p className="rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-xs text-slate-700">
+              Puedes seleccionarlos ahora y ajustarlos despues con el equipo comercial, sin friccion.
+            </p>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-3">
+            <Button
+              type="button"
+              className="bg-sky-600 text-white hover:bg-sky-700"
+              onClick={() => {
+                setShowModulosUpsellModal(false)
+                if (typeof window !== "undefined") {
+                  window.setTimeout(() => {
+                    document.getElementById("modulos-adicionales-section")?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    })
+                  }, 100)
+                }
+              }}
+            >
+              Si, quiero potenciarlo
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-slate-300"
+              onClick={() => {
+                skipModulosUpsellRef.current = true
+                setShowModulosUpsellModal(false)
+                goNext()
+              }}
+            >
+              Continuar sin modulos
             </Button>
           </DialogFooter>
         </DialogContent>

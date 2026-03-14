@@ -8,8 +8,23 @@ import path from "path"
 const TEMPLATE_PATH = path.join(process.cwd(), "assets", "templates", "PLANTILLA_INGRESO.xlsx")
 const STORAGE_BUCKET = "onboarding-excels"
 const SIGNED_URL_TTL_SECONDS = 14 * 24 * 60 * 60
+const MODULO_DASHBOARD_BI = "Dashboard BI"
+const MODULO_DASHBOARD_BI_LEGACY = "Dasboard BI"
 
 const sanitizeRut = (rut?: string) => (rut || "sin-rut").replace(/\./g, "").replace(/-/g, "").trim() || "sin-rut"
+
+const normalizeModuloAdicional = (value: string = "") => {
+  const normalized = value.trim()
+  if (!normalized) return ""
+  return normalized === MODULO_DASHBOARD_BI_LEGACY ? MODULO_DASHBOARD_BI : normalized
+}
+
+const normalizeModulosAdicionales = (values?: string[]) => {
+  const normalizedValues = Array.isArray(values)
+    ? values.map((value) => normalizeModuloAdicional(value || "")).filter((value) => value.length > 0)
+    : []
+  return Array.from(new Set(normalizedValues))
+}
 
 const formatTimestamp = () => {
   const now = new Date()
@@ -307,9 +322,13 @@ export async function POST(request: NextRequest) {
 
     const payload: ZohoPayload = await request.json()
     const formData = payload.formData ?? ({} as ZohoPayload["formData"])
+    const safeEmpresa = {
+      ...formData.empresa,
+      modulosAdicionales: normalizeModulosAdicionales(formData.empresa?.modulosAdicionales),
+    }
     const safeFormData = {
       ...formData,
-      empresa: formData.empresa ?? ({} as ZohoPayload["formData"]["empresa"]),
+      empresa: safeEmpresa ?? ({} as ZohoPayload["formData"]["empresa"]),
       admins: Array.isArray(formData.admins) ? formData.admins : [],
       trabajadores: Array.isArray(formData.trabajadores) ? formData.trabajadores : [],
       turnos: Array.isArray(formData.turnos) ? formData.turnos : [],

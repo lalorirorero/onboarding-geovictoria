@@ -32,6 +32,8 @@ export interface EmpresaData {
   ejecutivoTelefono?: string
   ejecutivoNombre?: string
   sistema?: string[]
+  modulosAdicionales?: string[]
+  modulosAdicionalesOtro?: string
   rubro?: string
   admins?: any[]
   trabajadores?: any[]
@@ -215,6 +217,8 @@ export interface ZohoPayload {
       ejecutivoTelefono?: string
       ejecutivoNombre?: string
       sistema: string[]
+      modulosAdicionales: string[]
+      modulosAdicionalesOtro: string
       rubro: string
     }
     admins: Array<{
@@ -398,6 +402,8 @@ export async function sendProgressWebhook(params: {
         emailFacturacion: "",
         telefonoContacto: "",
         sistema: [],
+        modulosAdicionales: [],
+        modulosAdicionalesOtro: "",
         rubro: "",
       },
       admins: [],
