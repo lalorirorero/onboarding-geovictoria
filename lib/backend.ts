@@ -326,24 +326,29 @@ export async function sendToZohoFlow(payload: ZohoPayload): Promise<{
     console.log("[v0] sendToZohoFlow: Status:", response.status, response.statusText)
     console.log("[v0] sendToZohoFlow: Headers:", Object.fromEntries(response.headers.entries()))
 
+    const rawBody = await response.text()
+
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error("[v0] sendToZohoFlow: ❌ ERROR - Response body:", errorText)
+      console.error("[v0] sendToZohoFlow: ❌ ERROR - Response body:", rawBody)
 
       return {
         success: false,
-        error: `Error ${response.status}: ${response.statusText} - ${errorText}`,
+        error: `Error ${response.status}: ${response.statusText} - ${rawBody}`,
       }
     }
 
     let data
-    try {
-      data = await response.json()
-      console.log("[v0] sendToZohoFlow: ✅ Respuesta JSON de Zoho:", data)
-    } catch (jsonError) {
-      // Si no es JSON válido, intentar leer como texto
-      data = await response.text()
-      console.log("[v0] sendToZohoFlow: ⚠️ Respuesta de Zoho (texto):", data)
+    if (!rawBody || rawBody.trim() === "") {
+      data = { success: true, emptyBody: true }
+      console.log("[v0] sendToZohoFlow: ✅ Respuesta vacia con 200 (aceptada por Zoho).")
+    } else {
+      try {
+        data = JSON.parse(rawBody)
+        console.log("[v0] sendToZohoFlow: ✅ Respuesta JSON de Zoho:", data)
+      } catch (jsonError) {
+        data = rawBody
+        console.log("[v0] sendToZohoFlow: ⚠️ Respuesta de Zoho (texto):", data)
+      }
     }
 
     console.log("[v0] sendToZohoFlow: ✅ ÉXITO - Datos enviados correctamente a Zoho Flow")
