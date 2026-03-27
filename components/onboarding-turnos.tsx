@@ -93,6 +93,19 @@ const stringifyPayload = (value: unknown, pretty = false) => {
   throw new Error("JSON.stringify no disponible en este entorno.")
 }
 
+const normalizeLegalText = (value: string) => value.replace(/\s+/g, " ").trim()
+
+const bytesToHex = (bytes: Uint8Array) => Array.from(bytes).map((byte) => byte.toString(16).padStart(2, "0")).join("")
+
+const fallbackFnv1a32 = (bytes: Uint8Array) => {
+  let hash = 0x811c9dc5
+  for (const byte of bytes) {
+    hash ^= byte
+    hash = Math.imul(hash, 0x01000193) >>> 0
+  }
+  return hash.toString(16).padStart(8, "0")
+}
+
 const getEstadoByStep = (step) => {
   if (step >= 11) return "Completado"
   if (step <= 1) return "No iniciado"
@@ -4838,7 +4851,7 @@ const AntesDeComenzarStep = ({
       </div>
 
       <div id="before-start-compliance" className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
-        <div className="space-y-2">
+        <div id="privacy-legal-summary" className="space-y-2">
           <h3 className="font-semibold text-slate-900">Resumen legal y privacidad</h3>
           <p className="text-sm text-slate-600">
             Tratamos los datos para habilitar tu onboarding, configurar tu empresa y coordinar la implementacion.
@@ -5298,6 +5311,7 @@ function OnboardingTurnosCliente() {
     representative: false,
     marketingChoice: null as boolean | null,
   })
+  const legalTextHashRef = useRef<string | null>(null)
 
   useEffect(() => {
     telefonoCallDeferredRef.current = Boolean(formData.telefonoCallDeferred)
@@ -5326,6 +5340,40 @@ function OnboardingTurnosCliente() {
     }
   }
 
+  const resolveLegalTextHash = useCallback(async () => {
+    if (legalTextHashRef.current) return legalTextHashRef.current
+    if (typeof document === "undefined") return null
+
+    const legalContainer = document.getElementById("privacy-legal-summary")
+    const legalText = normalizeLegalText(legalContainer?.textContent || "")
+    if (!legalText) return null
+
+    const hashInput = normalizeLegalText(
+      [
+        `policyVersion=${PRIVACY_POLICY_VERSION}`,
+        `policyUrl=${PRIVACY_POLICY_URL}`,
+        `legalText=${legalText}`,
+      ].join("\n"),
+    )
+
+    const bytes = new TextEncoder().encode(hashInput)
+
+    try {
+      if (typeof window !== "undefined" && window.crypto?.subtle?.digest) {
+        const digest = await window.crypto.subtle.digest("SHA-256", bytes)
+        const hash = `sha256:${bytesToHex(new Uint8Array(digest))}`
+        legalTextHashRef.current = hash
+        return hash
+      }
+    } catch (error) {
+      console.warn("[v0] resolveLegalTextHash: fallback hash por error en SHA-256", error)
+    }
+
+    const fallbackHash = `fnv1a32:${fallbackFnv1a32(bytes)}`
+    legalTextHashRef.current = fallbackHash
+    return fallbackHash
+  }, [])
+
   const trackConsentEvent = useCallback(
     async (
       eventType:
@@ -5338,6 +5386,7 @@ function OnboardingTurnosCliente() {
     ) => {
       if (!onboardingId) return
       try {
+        const legalTextHash = await resolveLegalTextHash()
         const payload = {
           formData: {
             ...formData,
@@ -5350,6 +5399,7 @@ function OnboardingTurnosCliente() {
             subjectType: "empresa_representante",
             eventType,
             policyVersion: PRIVACY_POLICY_VERSION,
+            legalTextHash,
             source: "web",
             metadata: {
               step: currentStep,
@@ -5373,7 +5423,7 @@ function OnboardingTurnosCliente() {
         console.warn("[v0] trackConsentEvent: Error no bloqueante", eventType, error)
       }
     },
-    [onboardingId, formData, currentStep, navigationHistory],
+    [onboardingId, formData, currentStep, navigationHistory, resolveLegalTextHash],
   )
 
   const handleBeforeStartComplianceChange = useCallback(
