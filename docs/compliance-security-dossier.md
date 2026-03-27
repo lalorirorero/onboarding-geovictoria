@@ -47,6 +47,7 @@ Nota: este documento es técnico-operativo y no reemplaza revisión jurídica fo
 | Protección de endpoints de cumplimiento | Validación por secreto (`COMPLIANCE_API_SECRET` o `CRON_SECRET`) | `lib/compliance.ts` | Implementado |
 | Integridad del flujo a Zoho Flow | Estructura de payload estable y envío validado | `app/api/submit-to-zoho/route.ts`, pruebas webhook | Implementado |
 | Manejo robusto de respuesta Zoho 200 sin body | Fix para no falsos negativos de envío | `lib/backend.ts` | Implementado |
+| Evidencia fuerte del texto legal aceptado | Hash del texto legal (`legalTextHash`) enviado en cada consentimiento y almacenado en BD | `components/onboarding-turnos.tsx`, `onboarding_consents.legal_text_hash` | Implementado |
 
 ---
 
@@ -58,6 +59,7 @@ Nota: este documento es técnico-operativo y no reemplaza revisión jurídica fo
 | 26-03-2026 | `aee53ee` | Fix envío Zoho (`200` sin body) | Evita falsos errores en trazabilidad de envío |
 | 26-03-2026 | `b051983` | Endpoints compliance + migraciones 001/002/003 | Habilita base técnica de cumplimiento |
 | 26-03-2026 | `9a6d99e` | Cron diario de retención seguro | Operacionaliza conservación limitada |
+| 27-03-2026 | `c48dcba` | Registro de `legalTextHash` en eventos de consentimiento | Fortalece prueba de qué texto legal exacto fue aceptado |
 
 ---
 
@@ -71,6 +73,7 @@ Checklist de evidencias recomendadas para presentar a Seguridad TI:
 - Respuesta real de `/api/compliance/retention?run=true` con secreto válido.
 - Evidencia de recepción de payloads en Zoho Flow History.
 - Configuración de secretos en Vercel (`CRON_SECRET` activo).
+- Evidencia en BD de `onboarding_consents.legal_text_hash` distinto de `null` para eventos de aceptación.
 
 ---
 
@@ -107,4 +110,3 @@ Cada cambio que afecte privacidad, retención, seguridad o integraciones externa
 - Descripción funcional.
 - Riesgo mitigado.
 - Evidencia de prueba.
-
