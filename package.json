@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "next build",
+    "contract:geo": "node scripts/validate-geo-zoho-contract.mjs",
     "dev": "next dev",
     "lint": "eslint .",
     "start": "next start"

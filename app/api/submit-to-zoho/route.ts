@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { sendToZohoFlow, type ZohoPayload } from "@/lib/backend"
+import { buildNormalizedZohoPayload } from "@/lib/zoho-payload-contract.mjs"
 import ExcelJS from "exceljs"
 import * as XLSX from "xlsx"
 import path from "path"
@@ -8,23 +9,8 @@ import path from "path"
 const TEMPLATE_PATH = path.join(process.cwd(), "assets", "templates", "PLANTILLA_INGRESO.xlsx")
 const STORAGE_BUCKET = "onboarding-excels"
 const SIGNED_URL_TTL_SECONDS = 14 * 24 * 60 * 60
-const MODULO_DASHBOARD_BI = "Dashboard BI"
-const MODULO_DASHBOARD_BI_LEGACY = "Dasboard BI"
 
 const sanitizeRut = (rut?: string) => (rut || "sin-rut").replace(/\./g, "").replace(/-/g, "").trim() || "sin-rut"
-
-const normalizeModuloAdicional = (value: string = "") => {
-  const normalized = value.trim()
-  if (!normalized) return ""
-  return normalized === MODULO_DASHBOARD_BI_LEGACY ? MODULO_DASHBOARD_BI : normalized
-}
-
-const normalizeModulosAdicionales = (values?: string[]) => {
-  const normalizedValues = Array.isArray(values)
-    ? values.map((value) => normalizeModuloAdicional(value || "")).filter((value) => value.length > 0)
-    : []
-  return Array.from(new Set(normalizedValues))
-}
 
 const formatTimestamp = () => {
   const now = new Date()
@@ -321,104 +307,8 @@ export async function POST(request: NextRequest) {
     console.log("[v0] ===== /api/submit-to-zoho: INICIO =====")
 
     const incomingPayload = (await request.json()) as Partial<ZohoPayload>
-    const incomingFormData = incomingPayload.formData ?? ({} as Partial<ZohoPayload["formData"]>)
-    const incomingEmpresa = incomingFormData.empresa ?? ({} as Partial<ZohoPayload["formData"]["empresa"]>)
-
-    // Normaliza y completa el payload para mantener estructura/orden estable en todos los pasos.
-    const safeEmpresa: ZohoPayload["formData"]["empresa"] = {
-      id_zoho: incomingEmpresa.id_zoho ?? incomingPayload.id_zoho ?? null,
-      razonSocial: incomingEmpresa.razonSocial || "",
-      nombreFantasia: incomingEmpresa.nombreFantasia || "",
-      rut: incomingEmpresa.rut || "",
-      giro: incomingEmpresa.giro || "",
-      direccion: incomingEmpresa.direccion || "",
-      comuna: incomingEmpresa.comuna || "",
-      emailFacturacion: incomingEmpresa.emailFacturacion || "",
-      telefonoContacto: incomingEmpresa.telefonoContacto || "",
-      ejecutivoTelefono: incomingEmpresa.ejecutivoTelefono || "",
-      ejecutivoNombre: incomingEmpresa.ejecutivoNombre || "",
-      sistema: Array.isArray(incomingEmpresa.sistema) ? incomingEmpresa.sistema : [],
-      modulosAdicionales: normalizeModulosAdicionales(incomingEmpresa.modulosAdicionales),
-      modulosAdicionalesOtro: incomingEmpresa.modulosAdicionalesOtro || "",
-      rubro: incomingEmpresa.rubro || "",
-      grupos: Array.isArray((incomingEmpresa as any).grupos) ? (incomingEmpresa as any).grupos : [],
-    }
-
-    const safeFormData: ZohoPayload["formData"] = {
-      empresa: safeEmpresa,
-      admins: Array.isArray(incomingFormData.admins) ? incomingFormData.admins : [],
-      trabajadores: Array.isArray(incomingFormData.trabajadores) ? incomingFormData.trabajadores : [],
-      turnos: Array.isArray(incomingFormData.turnos) ? incomingFormData.turnos : [],
-      planificaciones: Array.isArray(incomingFormData.planificaciones) ? incomingFormData.planificaciones : [],
-      asignaciones: Array.isArray(incomingFormData.asignaciones) ? incomingFormData.asignaciones : [],
-      configureNow: Boolean(incomingFormData.configureNow),
-    }
-
-    const metadataPasoActual =
-      typeof incomingPayload.metadata?.pasoActual === "number"
-        ? incomingPayload.metadata.pasoActual
-        : typeof incomingPayload.currentStep === "number"
-          ? incomingPayload.currentStep
-          : 0
-    const metadataTotalPasos =
-      typeof incomingPayload.metadata?.totalPasos === "number" ? incomingPayload.metadata.totalPasos : 0
-    const metadataPorcentaje =
-      typeof incomingPayload.metadata?.porcentajeProgreso === "number" ? incomingPayload.metadata.porcentajeProgreso : 0
-    const metadataEmpresaRut = incomingPayload.metadata?.empresaRut || safeEmpresa.rut || "Sin RUT"
-    const metadataEmpresaNombre =
-      incomingPayload.metadata?.empresaNombre || safeEmpresa.razonSocial || safeEmpresa.nombreFantasia || "Sin nombre"
-    const metadataPasoNombre = incomingPayload.metadata?.pasoNombre || `Paso ${metadataPasoActual}`
-    const metadataTotalTrabajadores =
-      typeof incomingPayload.metadata?.totalTrabajadores === "number"
-        ? incomingPayload.metadata.totalTrabajadores
-        : safeFormData.trabajadores.length
-    const metadataTotalGrupos =
-      typeof incomingPayload.metadata?.totalGrupos === "number"
-        ? incomingPayload.metadata.totalGrupos
-        : safeEmpresa.grupos.length
-    const metadataDecision =
-      typeof incomingPayload.metadata?.decision === "string" ? incomingPayload.metadata.decision : ""
-
-    const payload: ZohoPayload = {
-      accion: incomingPayload.accion === "completado" ? "completado" : "progreso",
-      fechaHoraEnvio:
-        typeof incomingPayload.fechaHoraEnvio === "string" && incomingPayload.fechaHoraEnvio.trim() !== ""
-          ? incomingPayload.fechaHoraEnvio
-          : new Date().toISOString(),
-      eventType: incomingPayload.eventType === "complete" ? "complete" : "progress",
-      id_zoho: incomingPayload.id_zoho ?? safeEmpresa.id_zoho ?? null,
-      onboardingId: incomingPayload.onboardingId ?? null,
-      currentStep: typeof incomingPayload.currentStep === "number" ? incomingPayload.currentStep : metadataPasoActual,
-      navigationHistory: Array.isArray(incomingPayload.navigationHistory) ? incomingPayload.navigationHistory : [],
-      estado:
-        incomingPayload.estado ||
-        (incomingPayload.eventType === "complete" || incomingPayload.accion === "completado" ? "Completado" : "En Curso"),
-      fecha_completado: incomingPayload.fecha_completado ?? null,
-      totalTrabajadores:
-        typeof incomingPayload.totalTrabajadores === "number"
-          ? incomingPayload.totalTrabajadores
-          : safeFormData.trabajadores.length,
-      formData: safeFormData,
-      metadata: {
-        empresaRut: metadataEmpresaRut,
-        empresaNombre: metadataEmpresaNombre,
-        pasoActual: metadataPasoActual,
-        pasoNombre: metadataPasoNombre,
-        totalPasos: metadataTotalPasos,
-        porcentajeProgreso: metadataPorcentaje,
-        totalTrabajadores: metadataTotalTrabajadores,
-        totalGrupos: metadataTotalGrupos,
-        decision: metadataDecision,
-      },
-      excelUrls: {
-        usuarios: incomingPayload.excelUrls?.usuarios || { filename: "", url: "" },
-        planificaciones: incomingPayload.excelUrls?.planificaciones || { filename: "", url: "" },
-      },
-      excelUrlUsuarios: incomingPayload.excelUrlUsuarios || incomingPayload.excelUrls?.usuarios?.url || "",
-      excelUrlPlanificaciones:
-        incomingPayload.excelUrlPlanificaciones || incomingPayload.excelUrls?.planificaciones?.url || "",
-      excelFile: incomingPayload.excelFile ?? null,
-    }
+    const payload = buildNormalizedZohoPayload(incomingPayload) as ZohoPayload
+    const safeFormData = payload.formData
 
     const historySupabaseUrl = process.env.SUPABASE_URL
     const historySupabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY

@@ -1,0 +1,142 @@
+{
+  "accion": "completado",
+  "fechaHoraEnvio": "2026-03-28T12:30:00.000Z",
+  "eventType": "complete",
+  "id_zoho": "APP-GEO-TEST-999",
+  "onboardingId": "onb_geo_999",
+  "currentStep": 11,
+  "navigationHistory": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    10,
+    11
+  ],
+  "estado": "Completado",
+  "fecha_completado": "2026-03-28T12:29:59.000Z",
+  "totalTrabajadores": 2,
+  "formData": {
+    "empresa": {
+      "id_zoho": "APP-GEO-TEST-999",
+      "razonSocial": "Geo Empresa Final",
+      "nombreFantasia": "Geo Final",
+      "rut": "98765432-1",
+      "giro": "Tecnologia",
+      "direccion": "Av. Final 999",
+      "comuna": "Providencia",
+      "emailFacturacion": "facturacion@geofinal.test",
+      "telefonoContacto": "+56933334444",
+      "ejecutivoTelefono": "+56988887777",
+      "ejecutivoNombre": "Ejecutivo Final",
+      "sistema": [
+        "GeoVictoria APP",
+        "Portal Web"
+      ],
+      "modulosAdicionales": [
+        "Dashboard BI"
+      ],
+      "modulosAdicionalesOtro": "",
+      "rubro": "20. Servicios",
+      "grupos": [
+        {
+          "id": 1,
+          "nombre": "BODEGA"
+        },
+        {
+          "id": 2,
+          "nombre": "VENTAS"
+        }
+      ]
+    },
+    "admins": [
+      {
+        "nombre": "Luis",
+        "apellido": "Admin",
+        "email": "luis@geo.test",
+        "telefono": "+56950000000",
+        "cargo": "Operaciones"
+      }
+    ],
+    "trabajadores": [
+      {
+        "nombre": "Trabajador Uno",
+        "rut": "11111111-1",
+        "correo": "uno@geo.test",
+        "grupo": "BODEGA"
+      },
+      {
+        "nombre": "Trabajador Dos",
+        "rut": "22222222-2",
+        "correo": "dos@geo.test",
+        "grupo": "VENTAS"
+      }
+    ],
+    "turnos": [
+      {
+        "id": "T1",
+        "nombre": "Manana",
+        "horaInicio": "08:00",
+        "horaFin": "17:00",
+        "diasSemana": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "color": "#000000"
+      }
+    ],
+    "planificaciones": [
+      {
+        "id": "P1",
+        "nombre": "Plan Semanal",
+        "fechaInicio": "2026-03-31",
+        "fechaFin": "2026-04-06",
+        "turnos": [
+          {
+            "turnoId": "T1",
+            "dias": [
+              "lunes"
+            ]
+          }
+        ]
+      }
+    ],
+    "asignaciones": [
+      {
+        "trabajadorRut": "11111111-1",
+        "planificacionId": "P1"
+      }
+    ],
+    "configureNow": true
+  },
+  "metadata": {
+    "empresaRut": "98765432-1",
+    "empresaNombre": "Geo Empresa Final",
+    "pasoActual": 11,
+    "pasoNombre": "Resumen",
+    "totalPasos": 12,
+    "porcentajeProgreso": 92,
+    "totalTrabajadores": 2,
+    "totalGrupos": 2,
+    "decision": "confirmar"
+  },
+  "excelUrls": {
+    "usuarios": {
+      "filename": "usuarios.xlsx",
+      "url": "https://files.test/usuarios.xlsx"
+    },
+    "planificaciones": {
+      "filename": "planificaciones.xlsx",
+      "url": "https://files.test/planificaciones.xlsx"
+    }
+  },
+  "excelUrlUsuarios": "https://files.test/usuarios.xlsx",
+  "excelUrlPlanificaciones": "https://files.test/planificaciones.xlsx",
+  "excelFile": null
+}

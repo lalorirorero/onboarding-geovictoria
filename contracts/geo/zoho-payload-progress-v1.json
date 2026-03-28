@@ -1,0 +1,91 @@
+{
+  "accion": "progreso",
+  "fechaHoraEnvio": "2026-03-28T12:00:00.000Z",
+  "eventType": "progress",
+  "id_zoho": "APP-GEO-TEST-001",
+  "onboardingId": "onb_geo_001",
+  "currentStep": 2,
+  "navigationHistory": [
+    0,
+    1,
+    2
+  ],
+  "estado": "En Curso",
+  "fecha_completado": null,
+  "totalTrabajadores": 1,
+  "formData": {
+    "empresa": {
+      "id_zoho": "APP-GEO-TEST-001",
+      "razonSocial": "Geo Empresa Test",
+      "nombreFantasia": "Geo Test",
+      "rut": "12345678-9",
+      "giro": "Servicios",
+      "direccion": "Calle 123",
+      "comuna": "Santiago",
+      "emailFacturacion": "facturacion@geo.test",
+      "telefonoContacto": "+56911112222",
+      "ejecutivoTelefono": "+56999990000",
+      "ejecutivoNombre": "Ejecutivo Geo",
+      "sistema": [
+        "GeoVictoria APP"
+      ],
+      "modulosAdicionales": [
+        "Dashboard BI",
+        "Permisos y Vacaciones"
+      ],
+      "modulosAdicionalesOtro": "",
+      "rubro": "20. Servicios",
+      "grupos": [
+        {
+          "id": 1,
+          "nombre": "OPERACIONES"
+        }
+      ]
+    },
+    "admins": [
+      {
+        "nombre": "Ana",
+        "apellido": "Admin",
+        "email": "ana@geo.test",
+        "telefono": "+56910000000",
+        "cargo": "RRHH"
+      }
+    ],
+    "trabajadores": [
+      {
+        "nombre": "Pedro Trabajador",
+        "rut": "11111111-1",
+        "correo": "pedro@geo.test",
+        "grupo": "OPERACIONES"
+      }
+    ],
+    "turnos": [],
+    "planificaciones": [],
+    "asignaciones": [],
+    "configureNow": false
+  },
+  "metadata": {
+    "empresaRut": "12345678-9",
+    "empresaNombre": "Geo Empresa Test",
+    "pasoActual": 2,
+    "pasoNombre": "Empresa",
+    "totalPasos": 12,
+    "porcentajeProgreso": 17,
+    "totalTrabajadores": 1,
+    "totalGrupos": 1,
+    "decision": ""
+  },
+  "excelUrls": {
+    "usuarios": {
+      "filename": "",
+      "url": ""
+    },
+    "planificaciones": {
+      "filename": "",
+      "url": ""
+    }
+  },
+  "excelUrlUsuarios": "",
+  "excelUrlPlanificaciones": "",
+  "excelFile": null
+}
