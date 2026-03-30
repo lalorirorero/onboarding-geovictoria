@@ -12,7 +12,7 @@ Repositorio oficial de la app de auto-onboarding administrada por GeoVictoria.
 
 Este repositorio es solo para GeoVictoria.
 
-- Repo Geo: `https://github.com/lalorirorero/v0-v0onboardingturnosmvp2main`
+- Repo Geo: `https://github.com/lalorirorero/onboarding-geovictoria`
 - Repo Nubox (separado): `https://github.com/lalorirorero/onboarding-nubox`
 
 Regla operativa: no mezclar cambios entre repositorios.
