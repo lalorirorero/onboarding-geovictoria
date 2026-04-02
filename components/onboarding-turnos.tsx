@@ -56,6 +56,7 @@ const steps = [
 const PRIMER_PASO = 0
 const PRIVACY_POLICY_VERSION = "v1.0-2026-03"
 const PRIVACY_POLICY_URL = "https://www.geovictoria.com/aviso-de-privacidad/"
+const ENABLE_SCHEDULING_AGENT = process.env.NEXT_PUBLIC_ENABLE_SCHEDULING_AGENT === "true"
 
 type BeforeStartComplianceState = {
   privacyNoticeAccepted: boolean
@@ -3871,7 +3872,8 @@ const AsignacionStep = ({
         <div className="rounded-xl border border-red-300 bg-red-50 p-3 text-[11px] text-red-800">{errorGlobal}</div>
       )}
 
-      <div className="space-y-3 rounded-xl border border-sky-200 bg-gradient-to-r from-sky-50 to-cyan-50 p-4">
+      {ENABLE_SCHEDULING_AGENT && (
+        <div className="space-y-3 rounded-xl border border-sky-200 bg-gradient-to-r from-sky-50 to-cyan-50 p-4">
         <div className="space-y-1">
           <h3 className="text-sm font-semibold text-slate-900">Agente de turnos y planificaciones (prototipo)</h3>
           <p className="text-xs text-slate-600">
@@ -4031,7 +4033,8 @@ const AsignacionStep = ({
             {agentIsThinking ? "Consultando modelo..." : "Enviar al agente"}
           </button>
         </form>
-      </div>
+        </div>
+      )}
 
       <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
         <div className="flex items-center justify-between">
