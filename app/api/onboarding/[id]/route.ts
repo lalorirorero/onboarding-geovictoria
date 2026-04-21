@@ -24,7 +24,6 @@ const VALID_CONSENT_EVENT_TYPES = new Set([
   "marketing_opt_in",
   "marketing_opt_out",
 ])
-const NUBOX_TOKEN_PREFIX = "nbx_"
 
 const toNonEmptyString = (value: unknown) => {
   if (typeof value !== "string") return ""
@@ -36,15 +35,6 @@ const parseDateSafe = (value: unknown) => {
   const dateValue = new Date(String(value))
   if (Number.isNaN(dateValue.getTime())) return null
   return dateValue
-}
-
-const resolveOnboardingIdFromToken = (rawId: string) => {
-  const trimmed = String(rawId || "").trim()
-  if (!trimmed) return ""
-  if (trimmed.startsWith(NUBOX_TOKEN_PREFIX)) {
-    return trimmed.slice(NUBOX_TOKEN_PREFIX.length)
-  }
-  return trimmed
 }
 
 const getClientIp = (request: NextRequest) => {
@@ -178,14 +168,13 @@ const persistConsentEvent = async (params: {
 // GET /api/onboarding/[id] - Obtener datos actuales del onboarding
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id: rawId } = await params
-    const id = resolveOnboardingIdFromToken(rawId)
+    const { id } = await params
 
     if (!id) {
       return NextResponse.json({ success: false, error: "ID requerido" }, { status: 400 })
     }
 
-    console.log(`[v0] GET /api/onboarding/${rawId} (resolved=${id})`)
+    console.log(`[v0] GET /api/onboarding/${id}`)
 
     const supabase = getAdminClientOrNull()
     if (!supabase) {
@@ -243,7 +232,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     return NextResponse.json({
       success: true,
-      onboardingId: id,
       id_zoho: data.id_zoho ?? null,
       formData: data.datos_actuales,
       lastStep: isCompleted ? 11 : data.ultimo_paso,
@@ -268,8 +256,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 // PATCH /api/onboarding/[id] - Actualizar datos del onboarding
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id: rawId } = await params
-    const id = resolveOnboardingIdFromToken(rawId)
+    const { id } = await params
     const body = await request.json()
 
     if (!id) {

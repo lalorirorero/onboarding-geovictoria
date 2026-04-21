@@ -38,7 +38,7 @@ import { useRouter } from "next/navigation" // Import useRouter
 
 // REMOVED: PersistenceManager and persistence types
 // quita // <-- This line was removed as it was identified as an undeclared variable in the updates.
-const LEGACY_STEPS = [
+const steps = [
   { id: 0, label: "Bienvenida", description: "Comienza aquí" },
   { id: 1, label: "Antes de comenzar", description: "Información del proceso" },
   { id: 2, label: "Empresa", description: "Datos base de la empresa" },
@@ -51,17 +51,6 @@ const LEGACY_STEPS = [
   { id: 9, label: "Asignaciones", description: "Asignar planificaciones a trabajadores" },
   { id: 10, label: "Resumen", description: "Revisión final" },
   { id: 11, label: "Agradecimiento", description: "¡Completado!" }, // Agregar paso de agradecimiento
-]
-
-const NUBOX_STEPS = [
-  { id: 0, label: "Bienvenida", description: "Ingresa RUT y comienza" },
-  { id: 1, label: "Antes de comenzar", description: "InformaciÃ³n del proceso" },
-  { id: 2, label: "Empresa", description: "ConfirmaciÃ³n de datos base" },
-  { id: 3, label: "Administrador principal", description: "QuiÃ©n administrarÃ¡ la plataforma" },
-  { id: 4, label: "Sistema de marcaje", description: "Selecciona forma de marcaje" },
-  { id: 5, label: "Trabajadores", description: "Carga de colaboradores" },
-  { id: 6, label: "Resumen", description: "RevisiÃ³n final" },
-  { id: 7, label: "Agradecimiento", description: "Â¡Completado!" },
 ]
 
 const PRIMER_PASO = 0
@@ -89,39 +78,6 @@ const TOOLTIP_GRUPO =
 
 const TOOLTIP_PERIODO_PLAN =
   "Estas fechas indican el periodo de vigencia de la planificación asignada a cada trabajador (por ejemplo, del 01-10 al 31-10)."
-
-const DEFAULT_PUBLIC_EMAIL_DOMAINS = [
-  "gmail.com",
-  "hotmail.com",
-  "outlook.com",
-  "yahoo.com",
-  "icloud.com",
-  "live.com",
-  "msn.com",
-  "aol.com",
-  "proton.me",
-  "protonmail.com",
-  "zoho.com",
-  "yandex.com",
-]
-
-const getBlockedPublicEmailDomains = () => {
-  const configured =
-    process.env.NEXT_PUBLIC_EMAIL_DOMAINS_BLOCKLIST || process.env.PUBLIC_EMAIL_DOMAINS_BLOCKLIST || ""
-  const list = configured
-    .split(",")
-    .map((entry) => entry.trim().toLowerCase())
-    .filter(Boolean)
-  return new Set(list.length > 0 ? list : DEFAULT_PUBLIC_EMAIL_DOMAINS)
-}
-
-const isPublicEmailDomain = (email: string) => {
-  const normalized = String(email || "").trim().toLowerCase()
-  if (!normalized.includes("@")) return false
-  const domain = normalized.split("@").pop() || ""
-  if (!domain) return false
-  return getBlockedPublicEmailDomains().has(domain)
-}
 
 const stringifyPayload = (value: unknown, pretty = false) => {
   const json = typeof globalThis !== "undefined" ? globalThis.JSON : undefined
@@ -311,7 +267,7 @@ const validateAdminsFields = (admins: any[]): { isValid: boolean; errors: string
   }
 }
 
-const Stepper = ({ currentStep, steps }: { currentStep: number; steps: Array<{ id: number; label: string; description: string }> }) => {
+const Stepper = ({ currentStep }) => {
   return (
     <div className="relative w-full">
       <div className="overflow-x-auto pb-2">
@@ -678,8 +634,7 @@ const ProtectedInput = React.memo<{
   type?: string
   placeholder?: string
   error?: string // Nueva prop para mostrar error
-  readOnly?: boolean
-}>(({ name, label, value, onChange, type = "text", placeholder, error, readOnly = false }) => {
+}>(({ name, label, value, onChange, type = "text", placeholder, error }) => {
   const labelText = label.replace(/\s*\*$/, "")
 
   return (
@@ -694,7 +649,6 @@ const ProtectedInput = React.memo<{
         name={name}
         value={value}
         onChange={onChange}
-        readOnly={readOnly}
         placeholder={placeholder}
         className={`w-full rounded-lg border ${
           error
@@ -728,20 +682,7 @@ const EmpresaStep = React.memo<{
   isFieldEdited: (fieldKey: string) => boolean
   trackFieldChange: (fieldKey: string, newValue: any) => void
   fieldErrors?: Record<string, string> // Nueva prop
-  readOnlyAll?: boolean
-  hideSistemaSection?: boolean
-}>(
-  ({
-    empresa,
-    setEmpresa,
-    prefilledFields,
-    isFieldPrefilled,
-    isFieldEdited,
-    trackFieldChange,
-    fieldErrors = {},
-    readOnlyAll = false,
-    hideSistemaSection = false,
-  }) => {
+}>(({ empresa, setEmpresa, prefilledFields, isFieldPrefilled, isFieldEdited, trackFieldChange, fieldErrors = {} }) => {
   const SISTEMAS = ["GeoVictoria BOX", "GeoVictoria CALL", "GeoVictoria APP", "GeoVictoria USB", "GeoVictoria WEB"]
 
   const SISTEMAS_INFO = {
@@ -941,7 +882,6 @@ const EmpresaStep = React.memo<{
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       const { name, value } = e.target
       const nextValue = name === "rut" ? value.replace(/\./g, "").toUpperCase() : value
-      if (readOnlyAll) return
       setEmpresa((prev) => ({ ...prev, [name]: nextValue }))
       if (isFieldPrefilled(`empresa.${name}`)) {
         trackFieldChange(`empresa.${name}`, nextValue)
@@ -952,7 +892,6 @@ const EmpresaStep = React.memo<{
 
   const handleSistemaChange = useCallback(
     (sistemaValue: string) => {
-      if (readOnlyAll) return
       setEmpresa((prev) => {
         const currentSistemas = prev.sistema || []
         const isSelected = currentSistemas.includes(sistemaValue)
@@ -1041,7 +980,6 @@ const EmpresaStep = React.memo<{
           placeholder="Ej: Tech Solutions S.A."
           value={empresa.razonSocial || ""}
           onChange={handleEmpresaChange}
-          readOnly={readOnlyAll}
           error={fieldErrors["empresa.razonSocial"]}
         />
         <ProtectedInput
@@ -1050,7 +988,6 @@ const EmpresaStep = React.memo<{
           placeholder="Ej: TechSol"
           value={empresa.nombreFantasia || ""}
           onChange={handleEmpresaChange}
-          readOnly={readOnlyAll}
           error={fieldErrors["empresa.nombreFantasia"]}
         />
         <ProtectedInput
@@ -1059,7 +996,6 @@ const EmpresaStep = React.memo<{
           placeholder="Ej: 12345678-9"
           value={empresa.rut || ""}
           onChange={handleEmpresaChange}
-          readOnly={readOnlyAll}
           error={fieldErrors["empresa.rut"]}
         />
         <ProtectedInput
@@ -1068,7 +1004,6 @@ const EmpresaStep = React.memo<{
           placeholder="Ej: Servicios de Tecnología"
           value={empresa.giro || ""}
           onChange={handleEmpresaChange}
-          readOnly={readOnlyAll}
           error={fieldErrors["empresa.giro"]}
         />
         <ProtectedInput
@@ -1077,7 +1012,6 @@ const EmpresaStep = React.memo<{
           placeholder="Ej: Av. Principal 123"
           value={empresa.direccion || ""}
           onChange={handleEmpresaChange}
-          readOnly={readOnlyAll}
           error={fieldErrors["empresa.direccion"]}
         />
         <ProtectedInput
@@ -1086,7 +1020,6 @@ const EmpresaStep = React.memo<{
           placeholder="Ej: Santiago"
           value={empresa.comuna || ""}
           onChange={handleEmpresaChange}
-          readOnly={readOnlyAll}
           error={fieldErrors["empresa.comuna"]}
         />
         <ProtectedInput
@@ -1096,7 +1029,6 @@ const EmpresaStep = React.memo<{
           placeholder="Ej: facturacion@empresa.com"
           value={empresa.emailFacturacion || ""}
           onChange={handleEmpresaChange}
-          readOnly={readOnlyAll}
           error={fieldErrors["empresa.emailFacturacion"]}
         />
         <ProtectedInput
@@ -1106,7 +1038,6 @@ const EmpresaStep = React.memo<{
           placeholder="Ej: +56912345678"
           value={empresa.telefonoContacto || ""}
           onChange={handleEmpresaChange}
-          readOnly={readOnlyAll}
           error={fieldErrors["empresa.telefonoContacto"]}
         />
       </div>
@@ -1120,7 +1051,6 @@ const EmpresaStep = React.memo<{
           name="rubro"
           value={empresa.rubro || ""}
           onChange={handleEmpresaChange}
-          disabled={readOnlyAll}
           className={`w-full rounded-lg border ${
             fieldErrors["empresa.rubro"] ? "border-red-500" : "border-slate-300"
           } px-4 py-2.5 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500`}
@@ -1136,7 +1066,6 @@ const EmpresaStep = React.memo<{
       </div>
       </article>
 
-      {!hideSistemaSection && (
       <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <header className="mb-4 border-b border-slate-100 pb-3">
           <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
@@ -1159,7 +1088,6 @@ const EmpresaStep = React.memo<{
                 key={sistema}
                 type="button"
                 onClick={() => handleSistemaChange(sistema)}
-                disabled={readOnlyAll}
                 className={`relative rounded-xl border-2 p-4 text-left transition-all ${
                   isSelected ? "border-sky-500 bg-sky-50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"
                 }`}
@@ -1196,7 +1124,6 @@ const EmpresaStep = React.memo<{
           </div>
         )}
       </article>
-      )}
 
       <article id="modulos-adicionales-section" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <header className="mb-4 border-b border-slate-100 pb-3">
@@ -1576,8 +1503,6 @@ const TrabajadoresStep = ({
         rowErrors.correo = "El correo es obligatorio."
       } else if (!isValidEmail(correoPersonal)) {
         rowErrors.correo = "Formato de correo inv?lido."
-      } else if (isPublicEmailDomain(correoPersonal)) {
-        rowErrors.correo = "Correo con dominio pÃºblico no permitido. Usa un correo corporativo."
       }
       
       if (!grupoNombre.trim()) {
@@ -5118,216 +5043,6 @@ type OnboardingFormData = {
   configureNow: boolean | undefined // Added undefined to allow initial state
   loadWorkersNow?: boolean // Added loadWorkersNow to OnboardingFormData
   telefonoCallDeferred?: boolean // Declaración de carga posterior de teléfono
-  empresaDataSource?: "token" | "hubspot_lookup" | "manual" | null
-  hubspotFound?: boolean
-  missingFields?: string[]
-  hardwareUsb?: {
-    arriendoValor?: string
-    cantidadLectores?: string
-    instalacionIncluida?: "si" | "no" | ""
-    instalacionValor?: string
-    envioIncluido?: "si" | "no" | ""
-    envioValor?: string
-    direccionEnvioInstalacion?: string
-    billingEditableContext?: boolean
-  }
-}
-
-const BienvenidaRutStep = ({
-  nombreEmpresa,
-  hasTokenData,
-  rutValue,
-  onRutChange,
-  onLookupRut,
-  rutLookupError,
-  rutLookupLoading,
-}: {
-  nombreEmpresa?: string
-  hasTokenData: boolean
-  rutValue: string
-  onRutChange: (value: string) => void
-  onLookupRut: () => void
-  rutLookupError: string
-  rutLookupLoading: boolean
-}) => {
-  if (hasTokenData) {
-    return <BienvenidaMarketingStep onContinue={onLookupRut} nombreEmpresa={nombreEmpresa} />
-  }
-
-  return (
-    <section className="space-y-8 rounded-xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-emerald-50 p-6 md:p-8">
-      <div className="text-center space-y-4">
-        <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Bienvenido al onboarding Nubox + GeoVictoria</h1>
-        <p className="text-slate-600 max-w-2xl mx-auto">
-          Ingresa el RUT de tu empresa para buscar los datos en HubSpot y continuar con el proceso.
-        </p>
-      </div>
-
-      <div className="mx-auto max-w-xl space-y-3">
-        <label className="block text-sm font-medium text-slate-700">
-          RUT empresa <span className="text-red-600">*</span>
-        </label>
-        <input
-          type="text"
-          value={rutValue}
-          onChange={(event) => onRutChange(event.target.value)}
-          placeholder="Ej: 12345678-9"
-          className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-        />
-        {rutLookupError ? <p className="text-sm text-red-600">{rutLookupError}</p> : null}
-      </div>
-
-      <div className="flex items-center justify-center">
-        <Button
-          onClick={onLookupRut}
-          disabled={rutLookupLoading}
-          size="lg"
-          className="bg-sky-600 hover:bg-sky-700 text-white text-base px-8 py-6 rounded-full"
-        >
-          {rutLookupLoading ? "Buscando empresa..." : "Comenzar mi implementaciÃ³n"}
-        </Button>
-      </div>
-    </section>
-  )
-}
-
-const SistemaMarcajeStep = ({
-  empresa,
-  setEmpresa,
-  hardwareUsb,
-  setHardwareUsb,
-  fieldErrors,
-}: {
-  empresa: Empresa
-  setEmpresa: (updater: Empresa | ((prev: Empresa) => Empresa)) => void
-  hardwareUsb: OnboardingFormData["hardwareUsb"]
-  setHardwareUsb: (updater: OnboardingFormData["hardwareUsb"]) => void
-  fieldErrors: Record<string, string>
-}) => {
-  const SISTEMAS = ["GeoVictoria BOX", "GeoVictoria CALL", "GeoVictoria APP", "GeoVictoria USB", "GeoVictoria WEB"]
-  const isUsbSelected = (empresa.sistema || []).includes("GeoVictoria USB")
-  const handleSistemaChange = (sistemaValue: string) => {
-    setEmpresa((prev) => {
-      const currentSistemas = prev.sistema || []
-      const isSelected = currentSistemas.includes(sistemaValue)
-      const newSistemas = isSelected ? currentSistemas.filter((s) => s !== sistemaValue) : [...currentSistemas, sistemaValue]
-      return { ...prev, sistema: newSistemas }
-    })
-  }
-
-  return (
-    <section className="space-y-6">
-      <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <header className="mb-4 border-b border-slate-100 pb-3">
-          <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
-            <Clock className="h-4 w-4 text-sky-500" />
-            Sistema de marcaje
-          </h3>
-          <p className="mt-1 text-sm text-slate-500">Selecciona el o los mÃ©todos que usarÃ¡ la empresa para marcar.</p>
-        </header>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {SISTEMAS.map((sistema) => {
-            const isSelected = empresa.sistema?.includes(sistema)
-            return (
-              <button
-                key={sistema}
-                type="button"
-                onClick={() => handleSistemaChange(sistema)}
-                className={`rounded-xl border-2 p-4 text-left transition-all ${
-                  isSelected ? "border-sky-500 bg-sky-50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-slate-900 text-sm">{sistema}</span>
-                  {isSelected ? <Check className="h-4 w-4 text-sky-600" /> : null}
-                </div>
-              </button>
-            )
-          })}
-        </div>
-        {fieldErrors["empresa.sistema"] ? <p className="mt-2 text-sm text-red-600">{fieldErrors["empresa.sistema"]}</p> : null}
-      </article>
-
-      {isUsbSelected ? (
-        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-          <header>
-            <h3 className="text-base font-semibold text-slate-900">ConfiguraciÃ³n lector USB biomÃ©trico</h3>
-            <p className="text-sm text-slate-500">Completa arriendo, instalaciÃ³n, envÃ­o y datos de facturaciÃ³n.</p>
-          </header>
-          <div className="grid gap-4 md:grid-cols-2">
-            <ProtectedInput
-              name="arriendoValor"
-              label="Arriendo (valor)"
-              value={hardwareUsb?.arriendoValor || ""}
-              onChange={(e) => setHardwareUsb({ ...hardwareUsb, arriendoValor: e.target.value, billingEditableContext: true })}
-              error={fieldErrors["hardwareUsb.arriendoValor"]}
-            />
-            <ProtectedInput
-              name="cantidadLectores"
-              label="Cantidad"
-              value={hardwareUsb?.cantidadLectores || ""}
-              onChange={(e) => setHardwareUsb({ ...hardwareUsb, cantidadLectores: e.target.value, billingEditableContext: true })}
-              error={fieldErrors["hardwareUsb.cantidadLectores"]}
-            />
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">InstalaciÃ³n incluida</label>
-              <select
-                value={hardwareUsb?.instalacionIncluida || ""}
-                onChange={(e) =>
-                  setHardwareUsb({ ...hardwareUsb, instalacionIncluida: e.target.value as "si" | "no" | "", billingEditableContext: true })
-                }
-                className="w-full rounded-lg border border-slate-300 px-3 py-2"
-              >
-                <option value="">Selecciona</option>
-                <option value="si">SÃ­</option>
-                <option value="no">No</option>
-              </select>
-            </div>
-            <ProtectedInput
-              name="instalacionValor"
-              label="InstalaciÃ³n (valor)"
-              value={hardwareUsb?.instalacionValor || ""}
-              onChange={(e) => setHardwareUsb({ ...hardwareUsb, instalacionValor: e.target.value, billingEditableContext: true })}
-              error={fieldErrors["hardwareUsb.instalacionValor"]}
-            />
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">EnvÃ­o incluido</label>
-              <select
-                value={hardwareUsb?.envioIncluido || ""}
-                onChange={(e) =>
-                  setHardwareUsb({ ...hardwareUsb, envioIncluido: e.target.value as "si" | "no" | "", billingEditableContext: true })
-                }
-                className="w-full rounded-lg border border-slate-300 px-3 py-2"
-              >
-                <option value="">Selecciona</option>
-                <option value="si">SÃ­</option>
-                <option value="no">No</option>
-              </select>
-            </div>
-            <ProtectedInput
-              name="envioValor"
-              label="EnvÃ­o (valor)"
-              value={hardwareUsb?.envioValor || ""}
-              onChange={(e) => setHardwareUsb({ ...hardwareUsb, envioValor: e.target.value, billingEditableContext: true })}
-              error={fieldErrors["hardwareUsb.envioValor"]}
-            />
-            <ProtectedInput
-              name="direccionEnvioInstalacion"
-              label="DirecciÃ³n de envÃ­o/instalaciÃ³n"
-              value={hardwareUsb?.direccionEnvioInstalacion || ""}
-              onChange={(e) =>
-                setHardwareUsb({ ...hardwareUsb, direccionEnvioInstalacion: e.target.value, billingEditableContext: true })
-              }
-              error={fieldErrors["hardwareUsb.direccionEnvioInstalacion"]}
-            />
-          </div>
-          <div className="rounded-lg border border-sky-100 bg-sky-50 p-3 text-xs text-sky-800">
-            Nota: valores de arriendo e instalaciÃ³n pueden variar segÃºn volumen y campaÃ±a comercial vigente.
-          </div>
-        </article>
-      ) : null}
-    </section>
-  )
 }
 
 // Define Grupo and Trabajador types for clarity (assuming they might be used elsewhere)
@@ -5490,7 +5205,7 @@ const NavigationButtons = () => {
 
 // Helper function to find the index of a step by its label
 const getStepIndexByLabel = (label: string): number => {
-  return LEGACY_STEPS.findIndex((step) => step.label === label)
+  return steps.findIndex((step) => step.label === label)
 }
 
 // Helper function to get the current step based on the navigation history
@@ -5553,19 +5268,6 @@ function OnboardingTurnosCliente() {
     configureNow: undefined,
     loadWorkersNow: undefined,
     telefonoCallDeferred: false,
-    empresaDataSource: null,
-    hubspotFound: false,
-    missingFields: [],
-    hardwareUsb: {
-      arriendoValor: "",
-      cantidadLectores: "",
-      instalacionIncluida: "",
-      instalacionValor: "",
-      envioIncluido: "",
-      envioValor: "",
-      direccionEnvioInstalacion: "",
-      billingEditableContext: false,
-    },
   })
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set())
   const [navigationHistory, setNavigationHistory] = useState([PRIMER_PASO])
@@ -5604,11 +5306,6 @@ function OnboardingTurnosCliente() {
   const [beforeStartComplianceErrors, setBeforeStartComplianceErrors] = useState<
     Partial<Record<keyof BeforeStartComplianceState, string>>
   >({})
-  const [isNuboxFlow, setIsNuboxFlow] = useState(false)
-  const [rutLookupValue, setRutLookupValue] = useState("")
-  const [rutLookupError, setRutLookupError] = useState("")
-  const [rutLookupLoading, setRutLookupLoading] = useState(false)
-  const [isEmpresaReadOnly, setIsEmpresaReadOnly] = useState(false)
   const complianceTrackingRef = useRef({
     shown: false,
     accepted: false,
@@ -5616,34 +5313,6 @@ function OnboardingTurnosCliente() {
     marketingChoice: null as boolean | null,
   })
   const legalTextHashRef = useRef<string | null>(null)
-  const steps = isNuboxFlow ? NUBOX_STEPS : LEGACY_STEPS
-  const summaryStep = isNuboxFlow ? 6 : 10
-  const gratitudeStep = isNuboxFlow ? 7 : 11
-  const hiddenNextSteps = isNuboxFlow ? new Set([1]) : new Set([1, 4, 6])
-  const getEstadoFlow = useCallback(
-    (step: number) => {
-      if (isNuboxFlow) {
-        if (step >= gratitudeStep) return "Completado"
-        if (step <= 1) return "No iniciado"
-        return "En Curso"
-      }
-      return getEstadoByStep(step)
-    },
-    [isNuboxFlow, gratitudeStep],
-  )
-
-  const getNuboxNextStep = useCallback((step: number) => {
-    const map: Record<number, number> = {
-      0: 1,
-      1: 2,
-      2: 3,
-      3: 4,
-      4: 5,
-      5: 6,
-      6: 7,
-    }
-    return map[step] ?? step + 1
-  }, [])
 
   useEffect(() => {
     telefonoCallDeferredRef.current = Boolean(formData.telefonoCallDeferred)
@@ -5726,7 +5395,7 @@ function OnboardingTurnosCliente() {
           },
           currentStep,
           navigationHistory,
-          estado: getEstadoFlow(currentStep),
+          estado: getEstadoByStep(currentStep),
           consentEvent: {
             subjectType: "empresa_representante",
             eventType,
@@ -5755,7 +5424,7 @@ function OnboardingTurnosCliente() {
         console.warn("[v0] trackConsentEvent: Error no bloqueante", eventType, error)
       }
     },
-    [onboardingId, formData, currentStep, navigationHistory, resolveLegalTextHash, getEstadoFlow],
+    [onboardingId, formData, currentStep, navigationHistory, resolveLegalTextHash],
   )
 
   const handleBeforeStartComplianceChange = useCallback(
@@ -5860,68 +5529,6 @@ function OnboardingTurnosCliente() {
 
   const hasInitialized = useRef(false)
 
-  const handleNuboxRutLookup = useCallback(async () => {
-    const rut = rutLookupValue.trim()
-    setRutLookupError("")
-
-    if (!rut) {
-      setRutLookupError("Debes ingresar el RUT de la empresa.")
-      return
-    }
-    if (!isRutFormatValid(rut) || !isValidRut(rut)) {
-      setRutLookupError("El RUT ingresado no es vÃ¡lido. Usa formato 12345678-9.")
-      return
-    }
-
-    setRutLookupLoading(true)
-    try {
-      const response = await fetch("/api/nubox/hubspot/company-by-rut", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: stringifyPayload({ rut }),
-      })
-      const result = await response.json()
-      if (!response.ok || !result?.success) {
-        setRutLookupError(result?.error || "No se pudo consultar HubSpot. Intenta nuevamente.")
-        return
-      }
-      if (!result.found) {
-        setRutLookupError("No encontramos tu empresa con ese RUT. Verifica e intenta nuevamente.")
-        return
-      }
-
-      const company = result.company || {}
-      const missingFields: string[] = Array.isArray(result.missingFields) ? result.missingFields : []
-      setFormData((prev) => ({
-        ...prev,
-        empresa: normalizeEmpresaModulos({
-          ...prev.empresa,
-          razonSocial: company.razonSocial || "",
-          nombreFantasia: company.nombreFantasia || "",
-          rut: company.rut || rut,
-          giro: company.giro || "",
-          direccion: company.direccion || "",
-          comuna: company.comuna || "",
-          emailFacturacion: company.emailFacturacion || "",
-          telefonoContacto: company.telefonoContacto || "",
-          rubro: company.rubro || "",
-        }),
-        empresaDataSource: "hubspot_lookup",
-        hubspotFound: true,
-        missingFields,
-      }))
-      setIsNuboxFlow(true)
-      setIsEmpresaReadOnly(missingFields.length === 0)
-      setCurrentStep(1)
-      setNavigationHistory([0, 1])
-    } catch (error) {
-      console.error("[v0] handleNuboxRutLookup error:", error)
-      setRutLookupError("No se pudo consultar HubSpot. Intenta nuevamente.")
-    } finally {
-      setRutLookupLoading(false)
-    }
-  }, [rutLookupValue])
-
   useEffect(() => {
     if (hasInitialized.current) {
       console.log("[v0] useEffect: Already initialized, skipping")
@@ -5943,10 +5550,6 @@ function OnboardingTurnosCliente() {
     // Read token from URL
     const urlParams = new URLSearchParams(window.location.search)
     const token = urlParams.get("token")
-    const flow = (urlParams.get("flow") || "").toLowerCase()
-    const isNuboxToken = Boolean(token && token.startsWith("nbx_"))
-    const shouldUseNuboxFlow = isNuboxToken || flow === "nubox"
-    setIsNuboxFlow(shouldUseNuboxFlow)
 
     console.log("[v0] Initial load: Token found:", token)
 
@@ -5960,10 +5563,9 @@ function OnboardingTurnosCliente() {
           console.log("[v0] Respuesta de BD:", result)
 
           if (result.success) {
-            // Set canonical onboarding ID (UUID interno), compatible con tokens partner (ej: nbx_*).
-            const resolvedOnboardingId = result.onboardingId || token
-            setOnboardingId(resolvedOnboardingId)
-            console.log("[v0] onboardingId establecido:", resolvedOnboardingId)
+            // Set onboarding ID
+            setOnboardingId(token)
+            console.log("[v0] onboardingId establecido:", token)
 
             // Set id_zoho from the database
             if (result.id_zoho) {
@@ -5979,18 +5581,7 @@ function OnboardingTurnosCliente() {
                 empresa: normalizeEmpresaModulos(result.formData.empresa || getEmptyEmpresa()),
                 turnos: result.formData.turnos?.length ? result.formData.turnos : DEFAULT_TURNOS,
               }
-              if (shouldUseNuboxFlow) {
-                loadedFormData.turnos = []
-                loadedFormData.planificaciones = []
-                loadedFormData.asignaciones = []
-                loadedFormData.configureNow = false
-                loadedFormData.loadWorkersNow = true
-              }
               setFormData(loadedFormData)
-              if (shouldUseNuboxFlow) {
-                const missing = Array.isArray((loadedFormData as any).missingFields) ? (loadedFormData as any).missingFields : []
-                setIsEmpresaReadOnly(missing.length === 0)
-              }
             }
 
             if (result.compliance) {
@@ -6013,9 +5604,7 @@ function OnboardingTurnosCliente() {
             }
 
             // Load last step
-            const flowGratitudeStep = shouldUseNuboxFlow ? 7 : 11
-            const rawLastStep = Math.max(result.lastStep ?? 0, result.currentStep ?? 0)
-            const lastStep = shouldUseNuboxFlow ? Math.min(rawLastStep, flowGratitudeStep) : rawLastStep
+            const lastStep = Math.max(result.lastStep ?? 0, result.currentStep ?? 0)
             console.log("[v0] lastStep:", lastStep)
 
             // Load navigation history
@@ -6026,11 +5615,11 @@ function OnboardingTurnosCliente() {
 
             // Show resume message if returning to advanced step (>= 3) and not completed
             console.log("[v0] lastStep >= 3?", lastStep >= 3)
-            console.log("[v0] lastStep < cierre?", lastStep < flowGratitudeStep)
+            console.log("[v0] lastStep < 11?", lastStep < 11)
 
-            if (lastStep >= 3 && lastStep < flowGratitudeStep) {
+            if (lastStep >= 3 && lastStep < 11) {
               console.log("[v0] Preparando mensaje de sesión retomada")
-              const stepName = (shouldUseNuboxFlow ? NUBOX_STEPS : LEGACY_STEPS)[lastStep]?.label || `Paso ${lastStep}`
+              const stepName = steps[lastStep]?.label || `Paso ${lastStep}` // Use label from steps array
               console.log("[v0] Step name:", stepName)
 
               setTimeout(() => {
@@ -6069,10 +5658,6 @@ function OnboardingTurnosCliente() {
       console.log("[v0] No token found - user must use link from /api/generate-link")
       // If no token, it implies this is a new onboarding. We will create a new record later if needed.
       // For now, we proceed with default empty state.
-      if (shouldUseNuboxFlow) {
-        setCurrentStep(0)
-        setNavigationHistory([0])
-      }
     }
 
     // Initialize groups and workers
@@ -6160,7 +5745,7 @@ function OnboardingTurnosCliente() {
       console.log("[v0] idZoho:", idZoho)
       console.log("[v0] formData:", formData)
 
-      const newHistory = [...navigationHistory, gratitudeStep]
+      const newHistory = [...navigationHistory, 11]
 
       const updatedFormData = {
         ...formData,
@@ -6177,18 +5762,18 @@ function OnboardingTurnosCliente() {
 
       const dataToSave = {
         formData: updatedFormData, // Use updatedFormData instead of formData
-        currentStep: gratitudeStep,
-        lastStep: gratitudeStep,
+        currentStep: 11,
+        lastStep: 11,
         navigationHistory: newHistory,
-        estado: "Completado",
+        estado: getEstadoByStep(11),
         totalTrabajadores: trabajadores.length,
         fecha_completado: new Date().toISOString(),
         // Make sure to save the updated groups and workers too
         trabajadores: trabajadores,
         empresa: { ...formData.empresa, grupos: grupos },
-        turnos: isNuboxFlow ? [] : formData.turnos,
-        planificaciones: isNuboxFlow ? [] : formData.planificaciones,
-        asignaciones: isNuboxFlow ? [] : formData.asignaciones,
+        turnos: formData.turnos, // Ensure turns are saved
+        planificaciones: formData.planificaciones, // Ensure planificaciones are saved
+        asignaciones: formData.asignaciones, // Ensure asignaciones are saved
       }
 
       // Marcar como completado en BD
@@ -6215,16 +5800,16 @@ function OnboardingTurnosCliente() {
         metadata: {
           empresaRut: formData.empresa.rut || "Sin RUT",
           empresaNombre: formData.empresa.razonSocial || formData.empresa.nombreFantasia || "Sin nombre",
-          pasoActual: gratitudeStep,
-          pasoNombre: steps[gratitudeStep]?.label || "Completado",
+          pasoActual: 11,
+          pasoNombre: steps[11]?.label || "Completado",
           totalPasos: steps.length,
           porcentajeProgreso: 100,
           totalTrabajadores: trabajadores.length,
           totalGrupos: grupos.length,
         },
-        currentStep: gratitudeStep,
+        currentStep: 11,
         navigationHistory: newHistory,
-        estado: "Completado",
+        estado: getEstadoByStep(11),
         fecha_completado: dataToSave.fecha_completado,
         excelUrls: {
           usuarios: { filename: "", url: "" },
@@ -6262,7 +5847,7 @@ function OnboardingTurnosCliente() {
       // </CHANGE>
 
       // Navegar a página de agradecimiento
-      setCurrentStep(gratitudeStep)
+      setCurrentStep(11)
       setNavigationHistory(newHistory)
       setCompletedSteps((prev) => [...prev, currentStep])
     } catch (error) {
@@ -6288,12 +5873,10 @@ function OnboardingTurnosCliente() {
     setNavigationHistory,
     trabajadores, // Include workers and groups for saving
     grupos,
-    gratitudeStep,
-    isNuboxFlow,
   ])
 
   const goNext = useCallback(async () => {
-    const nextStep = isNuboxFlow ? getNuboxNextStep(currentStep) : currentStep + 1
+    const nextStep = currentStep + 1
     const newHistory = [...navigationHistory, nextStep]
 
     let isValid = true
@@ -6301,11 +5884,7 @@ function OnboardingTurnosCliente() {
     const stepErrors: Record<string, string> = {}
 
     switch (currentStep) {
-      case 0: // Bienvenida
-        if (isNuboxFlow && !onboardingId && !formData.hubspotFound) {
-          isValid = false
-          errors.push("Debes buscar tu empresa por RUT antes de continuar.")
-        }
+      case 0: // Bienvenida - No validation needed
         break
       case 1: // Antes de comenzar
         setBeforeStartComplianceErrors({})
@@ -6323,13 +5902,10 @@ function OnboardingTurnosCliente() {
         break
       case 2: // Empresa
         const empresaValidation = validateEmpresaFields(formData.empresa)
-        const filteredEmpresaErrors = isNuboxFlow
-          ? empresaValidation.errors.filter((err) => !err.includes("Sistema"))
-          : empresaValidation.errors
-        if (filteredEmpresaErrors.length > 0) {
+        if (!empresaValidation.isValid) {
           isValid = false
           // Crear mensajes de error específicos para cada campo
-          filteredEmpresaErrors.forEach((err) => {
+          empresaValidation.errors.forEach((err) => {
             errors.push(err)
             // Mapear el error al campo específico
             if (err.includes("Razón Social")) stepErrors["empresa.razonSocial"] = "Este campo es obligatorio"
@@ -6367,31 +5943,7 @@ function OnboardingTurnosCliente() {
         }
         break
       case 4:
-        if (!isNuboxFlow) {
-          // This step handles its own navigation via onDecision.
-          break
-        }
-        if (!formData.empresa?.sistema || formData.empresa.sistema.length === 0) {
-          isValid = false
-          errors.push("Debes seleccionar al menos un sistema de marcaje.")
-          stepErrors["empresa.sistema"] = "Debes seleccionar al menos un sistema de marcaje"
-        }
-        if ((formData.empresa?.sistema || []).includes("GeoVictoria USB")) {
-          const usb = formData.hardwareUsb || {}
-          if (!String(usb.arriendoValor || "").trim()) stepErrors["hardwareUsb.arriendoValor"] = "Campo obligatorio"
-          if (!String(usb.cantidadLectores || "").trim()) stepErrors["hardwareUsb.cantidadLectores"] = "Campo obligatorio"
-          if (!String(usb.instalacionIncluida || "").trim()) stepErrors["hardwareUsb.instalacionIncluida"] = "Campo obligatorio"
-          if (!String(usb.instalacionValor || "").trim()) stepErrors["hardwareUsb.instalacionValor"] = "Campo obligatorio"
-          if (!String(usb.envioIncluido || "").trim()) stepErrors["hardwareUsb.envioIncluido"] = "Campo obligatorio"
-          if (!String(usb.envioValor || "").trim()) stepErrors["hardwareUsb.envioValor"] = "Campo obligatorio"
-          if (!String(usb.direccionEnvioInstalacion || "").trim()) {
-            stepErrors["hardwareUsb.direccionEnvioInstalacion"] = "Campo obligatorio"
-          }
-          if (Object.keys(stepErrors).some((key) => key.startsWith("hardwareUsb."))) {
-            isValid = false
-            errors.push("Completa todos los datos del lector USB biomÃ©trico para continuar.")
-          }
-        }
+        // This step handles its own navigation via onDecision.
         break
       case 5: // Trabajadores
         if (trabajadores.length === 0) {
@@ -6410,7 +5962,6 @@ function OnboardingTurnosCliente() {
             if (!isRutFormatValid(rut) || !isValidRut(rut)) return true
             if (!correo) return true
             if (!isValidEmail(correo)) return true
-            if (isPublicEmailDomain(correo)) return true
             if (!t.grupoId) return true
           }
         
@@ -6422,7 +5973,7 @@ function OnboardingTurnosCliente() {
 
         if (trabajadoresInvalidos.length > 0) {
           isValid = false
-          errors.push("Hay trabajadores con datos invÃ¡lidos. Revisa nombre, RUT, correo corporativo, grupo y telÃ©fonos.")
+          errors.push("Hay trabajadores con datos inv?lidos. Revisa nombre, RUT, correo, grupo y tel?fonos.")
           break
         }
 
@@ -6450,9 +6001,7 @@ function OnboardingTurnosCliente() {
         skipCallPhoneCheckRef.current = false
         break
       case 6:
-        if (!isNuboxFlow) {
-          // This step handles its own navigation via onDecision.
-        }
+        // This step handles its own navigation via onDecision.
         break
       case 7: // Turnos
         const hasCustomOrDefaultTurn =
@@ -6468,14 +6017,12 @@ function OnboardingTurnosCliente() {
         }
         break
       case 8: // Planificaciones
-        if (isNuboxFlow) break
         if (formData.configureNow && formData.turnos.length > 0 && formData.planificaciones.length === 0) {
           isValid = false
           errors.push("Debes crear al menos una planificación para continuar.")
         }
         break
       case 9: // Asignaciones
-        if (isNuboxFlow) break
         if (formData.configureNow) {
           const workersWithoutAssignment = trabajadores.filter(
             (t) =>
@@ -6488,7 +6035,6 @@ function OnboardingTurnosCliente() {
         }
         break
       case 10: // Resumen
-        if (isNuboxFlow) break
         return
       default:
         break
@@ -6585,7 +6131,7 @@ function OnboardingTurnosCliente() {
           currentStep: nextStep,
           lastStep: nextStep,
           navigationHistory: newHistory,
-          estado: getEstadoFlow(nextStep),
+          estado: getEstadoByStep(nextStep),
           totalTrabajadores: trabajadores.length,
         }
 
@@ -6616,7 +6162,7 @@ function OnboardingTurnosCliente() {
           },
           currentStep: nextStep,
           navigationHistory: newHistory,
-          estado: getEstadoFlow(nextStep),
+          estado: getEstadoByStep(nextStep),
           fecha_completado: null,
           excelUrls: {
             usuarios: { filename: "", url: "" },
@@ -6703,8 +6249,6 @@ function OnboardingTurnosCliente() {
     setBeforeStartComplianceErrors,
     trackConsentEvent,
     DEFAULT_TURNOS, // Added to dependencies
-    isNuboxFlow,
-    getNuboxNextStep,
   ])
 
   const goBack = useCallback(() => {
@@ -6732,7 +6276,7 @@ function OnboardingTurnosCliente() {
       </button>
       {showNext &&
         currentStep < steps.length - 1 && // Don't show "Next" on the last step before completion
-        !hiddenNextSteps.has(currentStep) && (
+        !(currentStep === 1 || currentStep === 4 || currentStep === 6) && ( // Hide Next for decision steps
           <button
             type="button"
             onClick={goNext}
@@ -6776,20 +6320,6 @@ function OnboardingTurnosCliente() {
 
     switch (currentStep) {
       case 0:
-        if (isNuboxFlow) {
-          const hasTokenData = Boolean(onboardingId)
-          return (
-            <BienvenidaRutStep
-              nombreEmpresa={formData.empresa.razonSocial}
-              hasTokenData={hasTokenData}
-              rutValue={rutLookupValue}
-              onRutChange={(value) => setRutLookupValue(value.replace(/\./g, "").toUpperCase())}
-              onLookupRut={hasTokenData ? goNext : handleNuboxRutLookup}
-              rutLookupError={rutLookupError}
-              rutLookupLoading={rutLookupLoading}
-            />
-          )
-        }
         return <BienvenidaMarketingStep onContinue={goNext} nombreEmpresa={formData.empresa.razonSocial} />
       case 1:
         // CHANGE: Corrected step numbering and component for case 1
@@ -6835,8 +6365,6 @@ function OnboardingTurnosCliente() {
               isFieldPrefilled={isFieldPrefilled}
               isFieldEdited={isFieldEdited}
               trackFieldChange={trackFieldChange}
-              readOnlyAll={isNuboxFlow && isEmpresaReadOnly}
-              hideSistemaSection={isNuboxFlow}
               fieldErrors={Object.keys(fieldErrors).reduce(
                 (acc, key) => {
                   if (key.startsWith("empresa.")) {
@@ -6883,25 +6411,6 @@ function OnboardingTurnosCliente() {
           </div>
         )
       case 4:
-        if (isNuboxFlow) {
-          return (
-            <div className="space-y-6">
-              <SistemaMarcajeStep
-                empresa={formData.empresa}
-                setEmpresa={setEmpresa}
-                hardwareUsb={formData.hardwareUsb}
-                setHardwareUsb={(next) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    hardwareUsb: next,
-                  }))
-                }
-                fieldErrors={fieldErrors}
-              />
-              <NavigationButtons />
-            </div>
-          )
-        }
         return (
           <div className="space-y-6">
             <WorkersDecisionStep onDecision={handleWorkersDecision} />
@@ -6945,34 +6454,6 @@ function OnboardingTurnosCliente() {
           </div>
         )
       case 6:
-        if (isNuboxFlow) {
-          return (
-            <section className="space-y-6">
-              <header>
-                <h2 className="text-lg font-semibold text-slate-900">Resumen</h2>
-                <p className="mt-1 text-sm text-slate-600">Revisa los datos antes de finalizar.</p>
-              </header>
-              <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p>
-                  <strong>Empresa:</strong> {formData.empresa.razonSocial || "Sin nombre"}
-                </p>
-                <p>
-                  <strong>RUT:</strong> {formData.empresa.rut || "Sin RUT"}
-                </p>
-                <p>
-                  <strong>Sistema(s):</strong> {(formData.empresa.sistema || []).join(", ") || "No seleccionado"}
-                </p>
-                <p>
-                  <strong>Administradores:</strong> {formData.admins.length}
-                </p>
-                <p>
-                  <strong>Trabajadores:</strong> {trabajadores.length}
-                </p>
-              </div>
-              <NavigationButtons />
-            </section>
-          )
-        }
         return (
           <div className="space-y-6">
             <DecisionStep onDecision={handleConfigurationDecision} />
@@ -6981,19 +6462,6 @@ function OnboardingTurnosCliente() {
         )
 
       case 7:
-        if (isNuboxFlow) {
-          return (
-            <section className="space-y-6 text-center">
-              <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/30 mx-auto">
-                <Check className="w-12 h-12 text-white" />
-              </div>
-              <h1 className="text-3xl md:text-4xl font-bold text-slate-800">Â¡Gracias por completar tu onboarding!</h1>
-              <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-                Tu ejecutivo comercial Nubox tomarÃ¡ contacto para continuar con el proceso.
-              </p>
-            </section>
-          )
-        }
         return (
           <>
             <TurnosStep
@@ -7274,7 +6742,7 @@ function OnboardingTurnosCliente() {
           currentStep: nextStep,
           lastStep: nextStep,
           navigationHistory: newHistory,
-          estado: getEstadoFlow(nextStep),
+          estado: getEstadoByStep(nextStep),
         }
 
         // Guardar en BD
@@ -7303,7 +6771,7 @@ function OnboardingTurnosCliente() {
           },
           currentStep: nextStep,
           navigationHistory: newHistory,
-          estado: getEstadoFlow(nextStep),
+          estado: getEstadoByStep(nextStep),
         }
 
         const zohoPromise = fetch("/api/submit-to-zoho", {
@@ -7372,7 +6840,7 @@ function OnboardingTurnosCliente() {
           currentStep: nextStep,
           lastStep: nextStep,
           navigationHistory: newHistory,
-          estado: getEstadoFlow(nextStep),
+          estado: getEstadoByStep(nextStep),
         }
 
         // Guardar en BD
@@ -7401,7 +6869,7 @@ function OnboardingTurnosCliente() {
           },
           currentStep: nextStep,
           navigationHistory: newHistory,
-          estado: getEstadoFlow(nextStep),
+          estado: getEstadoByStep(nextStep),
         }
 
         const zohoPromise = fetch("/api/submit-to-zoho", {
@@ -7547,7 +7015,7 @@ function OnboardingTurnosCliente() {
           </div>
         </div>
         <div className="mt-4">
-          <Stepper currentStep={currentStep} steps={steps} />
+          <Stepper currentStep={currentStep} />
         </div>
       </nav>
 

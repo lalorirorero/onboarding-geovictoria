@@ -324,9 +324,6 @@ export async function POST(request: NextRequest) {
     const incomingFormData = incomingPayload.formData ?? ({} as Partial<ZohoPayload["formData"]>)
     const incomingEmpresa = incomingFormData.empresa ?? ({} as Partial<ZohoPayload["formData"]["empresa"]>)
 
-    const metodosMarcaje = Array.isArray(incomingEmpresa.sistema) ? incomingEmpresa.sistema : []
-    const metodosMarcajeTexto = metodosMarcaje.join(", ")
-
     // Normaliza y completa el payload para mantener estructura/orden estable en todos los pasos.
     const safeEmpresa: ZohoPayload["formData"]["empresa"] = {
       id_zoho: incomingEmpresa.id_zoho ?? incomingPayload.id_zoho ?? null,
@@ -340,12 +337,7 @@ export async function POST(request: NextRequest) {
       telefonoContacto: incomingEmpresa.telefonoContacto || "",
       ejecutivoTelefono: incomingEmpresa.ejecutivoTelefono || "",
       ejecutivoNombre: incomingEmpresa.ejecutivoNombre || "",
-      sistema: metodosMarcaje,
-      // Compatibilidad con mapeos legacy de Zoho Flow/CRM (incluyendo typo historico).
-      M_doto_Marcaje: metodosMarcaje,
-      M_todo_de_Marcaje: metodosMarcaje,
-      M_todo_Marcaje: metodosMarcaje,
-      metodosMarcajeTexto,
+      sistema: Array.isArray(incomingEmpresa.sistema) ? incomingEmpresa.sistema : [],
       modulosAdicionales: normalizeModulosAdicionales(incomingEmpresa.modulosAdicionales),
       modulosAdicionalesOtro: incomingEmpresa.modulosAdicionalesOtro || "",
       rubro: incomingEmpresa.rubro || "",
@@ -427,12 +419,6 @@ export async function POST(request: NextRequest) {
         incomingPayload.excelUrlPlanificaciones || incomingPayload.excelUrls?.planificaciones?.url || "",
       excelFile: incomingPayload.excelFile ?? null,
     }
-
-    // Alias adicionales a nivel raiz para flows con mapeos antiguos.
-    ;(payload as ZohoPayload & Record<string, unknown>).M_doto_Marcaje = metodosMarcaje
-    ;(payload as ZohoPayload & Record<string, unknown>).M_todo_de_Marcaje = metodosMarcaje
-    ;(payload as ZohoPayload & Record<string, unknown>).M_todo_Marcaje = metodosMarcaje
-    ;(payload as ZohoPayload & Record<string, unknown>).metodosMarcajeTexto = metodosMarcajeTexto
 
     const historySupabaseUrl = process.env.SUPABASE_URL
     const historySupabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
