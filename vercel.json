@@ -1,4 +1,103 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/nubox",
+      "destination": "https://onboarding-nubox.vercel.app/nubox"
+    },
+    {
+      "source": "/nubox/:path*",
+      "destination": "https://onboarding-nubox.vercel.app/nubox/:path*"
+    },
+    {
+      "source": "/_next/:path*",
+      "has": [
+        {
+          "type": "header",
+          "key": "referer",
+          "value": "https://onboarding\\.geovictoria\\.com/nubox.*"
+        }
+      ],
+      "destination": "https://onboarding-nubox.vercel.app/_next/:path*"
+    },
+    {
+      "source": "/images/:path*",
+      "has": [
+        {
+          "type": "header",
+          "key": "referer",
+          "value": "https://onboarding\\.geovictoria\\.com/nubox.*"
+        }
+      ],
+      "destination": "https://onboarding-nubox.vercel.app/images/:path*"
+    },
+    {
+      "source": "/logo-nubox.svg",
+      "has": [
+        {
+          "type": "header",
+          "key": "referer",
+          "value": "https://onboarding\\.geovictoria\\.com/nubox.*"
+        }
+      ],
+      "destination": "https://onboarding-nubox.vercel.app/logo-nubox.svg"
+    },
+    {
+      "source": "/logo-geovictoria.png",
+      "has": [
+        {
+          "type": "header",
+          "key": "referer",
+          "value": "https://onboarding\\.geovictoria\\.com/nubox.*"
+        }
+      ],
+      "destination": "https://onboarding-nubox.vercel.app/logo-geovictoria.png"
+    },
+    {
+      "source": "/icon-light-32x32.png",
+      "has": [
+        {
+          "type": "header",
+          "key": "referer",
+          "value": "https://onboarding\\.geovictoria\\.com/nubox.*"
+        }
+      ],
+      "destination": "https://onboarding-nubox.vercel.app/icon-light-32x32.png"
+    },
+    {
+      "source": "/icon-dark-32x32.png",
+      "has": [
+        {
+          "type": "header",
+          "key": "referer",
+          "value": "https://onboarding\\.geovictoria\\.com/nubox.*"
+        }
+      ],
+      "destination": "https://onboarding-nubox.vercel.app/icon-dark-32x32.png"
+    },
+    {
+      "source": "/icon.svg",
+      "has": [
+        {
+          "type": "header",
+          "key": "referer",
+          "value": "https://onboarding\\.geovictoria\\.com/nubox.*"
+        }
+      ],
+      "destination": "https://onboarding-nubox.vercel.app/icon.svg"
+    },
+    {
+      "source": "/apple-icon.png",
+      "has": [
+        {
+          "type": "header",
+          "key": "referer",
+          "value": "https://onboarding\\.geovictoria\\.com/nubox.*"
+        }
+      ],
+      "destination": "https://onboarding-nubox.vercel.app/apple-icon.png"
+    }
+  ],
   "crons": [
     {
       "path": "/api/compliance/retention?run=true",
