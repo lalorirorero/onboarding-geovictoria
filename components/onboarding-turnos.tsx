@@ -38,6 +38,11 @@ import { useRouter } from "next/navigation" // Import useRouter
 
 // REMOVED: PersistenceManager and persistence types
 // quita // <-- This line was removed as it was identified as an undeclared variable in the updates.
+// Sitio al que redirigimos cuando el acceso a la app no es valido (sin token / token roto).
+const GEOVICTORIA_WEBSITE_URL = "https://www.geovictoria.com"
+// Tiempo de espera antes de redirigir automaticamente al sitio de GeoVictoria.
+const UNAVAILABLE_REDIRECT_MS = 5000
+
 const steps = [
   { id: 0, label: "Bienvenida", description: "Comienza aquí" },
   { id: 1, label: "Antes de comenzar", description: "Información del proceso" },
@@ -5286,6 +5291,15 @@ function OnboardingTurnosCliente() {
 
   const [isInitialized, setIsInitialized] = useState(false)
 
+  // Estado para links de onboarding que ya no se pueden usar (expirados / no disponibles).
+  // Cuando esta seteado, mostramos una pantalla clara en vez de un formulario vacio.
+  const [linkUnavailable, setLinkUnavailable] = useState<{
+    title: string
+    message: string
+    code?: string
+    redirectUrl?: string
+  } | null>(null)
+
   const [showDesktopNotice, setShowDesktopNotice] = useState(false)
 
   const [showResumeMessage, setShowResumeMessage] = useState(false)
@@ -5317,6 +5331,17 @@ function OnboardingTurnosCliente() {
   useEffect(() => {
     telefonoCallDeferredRef.current = Boolean(formData.telefonoCallDeferred)
   }, [formData.telefonoCallDeferred])
+
+  // Redirige automaticamente al sitio de GeoVictoria cuando el acceso no es valido
+  // (sin token / token roto / no encontrado). Tambien hay un boton manual en la pantalla.
+  useEffect(() => {
+    if (!linkUnavailable?.redirectUrl || typeof window === "undefined") return
+    const target = linkUnavailable.redirectUrl
+    const timer = setTimeout(() => {
+      window.location.href = target
+    }, UNAVAILABLE_REDIRECT_MS)
+    return () => clearTimeout(timer)
+  }, [linkUnavailable])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -5639,12 +5664,47 @@ function OnboardingTurnosCliente() {
             )
           }
         } else {
-          console.error("[v0] Error al cargar datos:", response.statusText)
-          toast({
-            title: "Error",
-            description: "No se pudo cargar el progreso del onboarding.",
-            variant: "destructive",
-          })
+          console.error("[v0] Error al cargar datos:", response.status, response.statusText)
+
+          // Intentar leer el detalle del backend (puede venir con un codigo especifico).
+          let errorBody: any = null
+          try {
+            errorBody = await response.json()
+          } catch {
+            errorBody = null
+          }
+
+          // Link expirado o dado de baja (410): pantalla dedicada con datos del ejecutivo,
+          // sin redirigir (es un link valido pero antiguo; conviene pedir uno nuevo).
+          if (response.status === 410 || errorBody?.code === "TOKEN_EXPIRED" || errorBody?.code === "ONBOARDING_UNAVAILABLE") {
+            const isExpired = errorBody?.code === "TOKEN_EXPIRED" || response.status === 410
+            setLinkUnavailable({
+              code: errorBody?.code,
+              title: isExpired ? "Este enlace expiró" : "Enlace no disponible",
+              message:
+                errorBody?.error ||
+                (isExpired
+                  ? "El enlace de onboarding venció. Solicita uno nuevo a tu ejecutivo comercial para continuar."
+                  : "Este enlace de onboarding ya no está disponible. Solicita uno nuevo a tu ejecutivo comercial."),
+            })
+          } else if (response.status >= 500) {
+            // Error temporal del servidor: NO redirigimos para no echar a un cliente legitimo.
+            toast({
+              title: "Error temporal",
+              description: errorBody?.error || "No se pudo cargar el onboarding. Intenta de nuevo en unos minutos.",
+              variant: "destructive",
+            })
+          } else {
+            // Token roto / inexistente (404 u otro 4xx): la app no esta disponible por esta via.
+            // Mostramos aviso y redirigimos al sitio de GeoVictoria.
+            setLinkUnavailable({
+              code: errorBody?.code || "INVALID_TOKEN",
+              title: "Enlace no disponible",
+              message:
+                "Para iniciar tu configuración, solicita tu enlace a tu ejecutivo comercial de GeoVictoria. Te redirigiremos a nuestro sitio web.",
+              redirectUrl: GEOVICTORIA_WEBSITE_URL,
+            })
+          }
         }
       } catch (error) {
         console.error("[v0] Error en fetch:", error)
@@ -5655,9 +5715,18 @@ function OnboardingTurnosCliente() {
         })
       }
     } else {
-      console.log("[v0] No token found - user must use link from /api/generate-link")
-      // If no token, it implies this is a new onboarding. We will create a new record later if needed.
-      // For now, we proceed with default empty state.
+      console.log("[v0] No token found - acceso no permitido sin link tokenizado")
+      // La app solo es accesible mediante un link con token valido. Sin token mostramos
+      // el aviso y redirigimos al sitio de GeoVictoria.
+      setLinkUnavailable({
+        code: "NO_TOKEN",
+        title: "Enlace no disponible",
+        message:
+          "Para iniciar tu configuración, solicita tu enlace a tu ejecutivo comercial de GeoVictoria. Te redirigiremos a nuestro sitio web.",
+        redirectUrl: GEOVICTORIA_WEBSITE_URL,
+      })
+      setIsInitialized(true)
+      return
     }
 
     // Initialize groups and workers
@@ -6929,6 +6998,45 @@ function OnboardingTurnosCliente() {
     }
   }
   // </CHANGE>
+
+  // Link expirado o no disponible: pantalla dedicada (no mostramos el formulario vacio).
+  if (linkUnavailable) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 px-6 py-12">
+        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-xl">
+          <div className="mx-auto mb-5 inline-flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
+            <AlertCircle className="h-8 w-8 text-amber-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-800">{linkUnavailable.title}</h1>
+          <p className="mt-3 text-base text-slate-600">{linkUnavailable.message}</p>
+          {linkUnavailable.redirectUrl ? (
+            <>
+              <a
+                href={linkUnavailable.redirectUrl}
+                className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-sky-600"
+              >
+                Ir a GeoVictoria
+              </a>
+              <p className="mt-3 text-xs text-slate-400">Te redirigiremos automáticamente en unos segundos…</p>
+            </>
+          ) : formData.empresa.ejecutivoTelefono ? (
+            <a
+              href={`https://wa.me/${formData.empresa.ejecutivoTelefono.replace(/[^0-9]/g, "")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-600"
+            >
+              Contactar a mi ejecutivo
+            </a>
+          ) : (
+            <p className="mt-6 text-sm text-slate-500">
+              Contacta a tu ejecutivo comercial de GeoVictoria para recibir un enlace nuevo.
+            </p>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-br from-slate-50 to-slate-100">
