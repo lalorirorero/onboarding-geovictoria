@@ -1,8 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSupabaseAdminClient } from "@/lib/supabase/admin"
 
-const DEFAULT_TOKEN_TTL_DAYS = 30
-
 const toNonEmptyString = (value: unknown) => {
   if (typeof value !== "string") return ""
   return value.trim()
@@ -19,9 +17,11 @@ const toBoolean = (value: unknown, fallback = false) => {
   return fallback
 }
 
-const getTokenTtlDays = () => {
+// Por defecto los links de onboarding NO caducan (pedido del equipo de Telemarketing).
+// Si se configura ONBOARDING_TOKEN_TTL_DAYS con un numero positivo, se aplica ese TTL en dias.
+const getTokenTtlDays = (): number | null => {
   const raw = Number.parseInt(process.env.ONBOARDING_TOKEN_TTL_DAYS || "", 10)
-  if (!Number.isFinite(raw) || raw <= 0) return DEFAULT_TOKEN_TTL_DAYS
+  if (!Number.isFinite(raw) || raw <= 0) return null
   return raw
 }
 
@@ -79,7 +79,8 @@ export async function POST(request: NextRequest) {
 
     const id_zoho = body.id_zoho ? String(body.id_zoho) : null
     const tokenTtlDays = getTokenTtlDays()
-    const tokenExpiresAt = new Date(Date.now() + tokenTtlDays * 24 * 60 * 60 * 1000).toISOString()
+    const tokenExpiresAt =
+      tokenTtlDays === null ? null : new Date(Date.now() + tokenTtlDays * 24 * 60 * 60 * 1000).toISOString()
 
     const sourceCrm = toNonEmptyString(body.source_crm || body.sourceCRM) || "zoho_crm"
     const sourcePartner = toNonEmptyString(body.source_partner || body.sourcePartner) || null
