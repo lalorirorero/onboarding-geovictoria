@@ -20,10 +20,15 @@ function instalarModoDemo(): void {
   w.__vickyDemoFetch = true
 
   // El componente exige un token en la URL; en demo lo inyectamos nosotros.
+  // OJO: tiene que ser una navegación REAL (no history.replaceState): el router
+  // de Next re-sincroniza la URL durante la hidratación y pisa cualquier token
+  // inyectado por history — el onboarding leería la URL ya sin token y caería
+  // en la pantalla "Enlace no disponible".
   const params = new URLSearchParams(window.location.search)
   if (!params.get("token")) {
     params.set("token", "demo-producto")
-    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`)
+    window.location.replace(`${window.location.pathname}?${params.toString()}`)
+    return
   }
 
   const realFetch = window.fetch.bind(window)
