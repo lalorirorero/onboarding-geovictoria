@@ -6333,6 +6333,38 @@ function OnboardingTurnosCliente() {
   }, [navigationHistory, setCurrentStep, setNavigationHistory, setFieldErrors, setValidationErrors, setNoAdminsError])
 
   // Helper to render navigation buttons
+  // Válvula de escape SIEMPRE visible dentro de la zona de turnos (pasos 7-9):
+  // quien entró a configurar y no tiene la información a mano (o se arrepintió)
+  // puede saltar al Resumen y finalizar sin turnos, igual que la opción
+  // "configurar en capacitación" del paso 6. Reutiliza handleConfigurationDecision
+  // ("later"): guarda la decisión en BD + Zoho y NO pierde lo ya avanzado.
+  // Motivo: mitigar abandono por atasco en turnos (medido: bajo, pero el costo
+  // de quedar atrapado es perder la activación completa).
+  const SalidaTurnosBanner = () => (
+    <div className="mt-8 rounded-2xl border border-sky-200 bg-sky-50 p-4 sm:p-5 dark:border-sky-800 dark:bg-sky-950/40">
+      <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:text-left">
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+            ¿No tienes esta información a mano?
+          </p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            No hay problema: puedes finalizar tu activación ahora y configurar los turnos después,
+            junto a tu ejecutivo en la capacitación. Lo que ya avanzaste no se pierde.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => handleConfigurationDecision("later")}
+          disabled={isSubmitting}
+          className="inline-flex shrink-0 items-center gap-2 rounded-full border border-sky-400 bg-white px-5 py-2.5 text-sm font-semibold text-sky-700 hover:bg-sky-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed dark:bg-slate-900 dark:text-sky-300 dark:hover:bg-slate-800"
+        >
+          Finalizar sin configurar turnos
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  )
+
   const NavigationButtons = ({ showNext = true }: { showNext?: boolean }) => (
     <div className="mt-8 flex items-center justify-center gap-4">
       <button
@@ -6553,6 +6585,7 @@ function OnboardingTurnosCliente() {
               turnos={formData.turnos}
               setTurnos={(newTurnos) => setFormData((prev) => ({ ...prev, turnos: newTurnos }))}
             />
+            <SalidaTurnosBanner />
             <NavigationButtons />
           </>
         )
@@ -6566,6 +6599,7 @@ function OnboardingTurnosCliente() {
               }
               turnos={formData.turnos}
             />
+            <SalidaTurnosBanner />
             <NavigationButtons />
           </>
         )
@@ -6611,6 +6645,7 @@ function OnboardingTurnosCliente() {
               grupos={grupos}
               errorGlobal={validationErrors.join(" ")}
             />
+            <SalidaTurnosBanner />
             <NavigationButtons />
           </>
         )
