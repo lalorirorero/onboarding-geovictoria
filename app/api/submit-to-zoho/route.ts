@@ -394,12 +394,24 @@ export async function POST(request: NextRequest) {
         incomingPayload.estado ||
         (incomingPayload.eventType === "complete" || incomingPayload.accion === "completado" ? "Completado" : "En Curso"),
       fecha_completado: incomingPayload.fecha_completado ?? null,
+      // País/territorio del onboarding (tropicalización MX). Campo adicional:
+      // si el cliente no lo manda, se asume Chile (comportamiento histórico).
+      pais:
+        typeof incomingPayload.pais === "string" && incomingPayload.pais.trim() !== ""
+          ? incomingPayload.pais.trim()
+          : "Chile",
       totalTrabajadores:
         typeof incomingPayload.totalTrabajadores === "number"
           ? incomingPayload.totalTrabajadores
           : safeFormData.trabajadores.length,
       formData: safeFormData,
       metadata: {
+        pais:
+          typeof incomingPayload.metadata?.pais === "string" && incomingPayload.metadata.pais.trim() !== ""
+            ? incomingPayload.metadata.pais.trim()
+            : typeof incomingPayload.pais === "string" && incomingPayload.pais.trim() !== ""
+              ? incomingPayload.pais.trim()
+              : "Chile",
         empresaRut: metadataEmpresaRut,
         empresaNombre: metadataEmpresaNombre,
         pasoActual: metadataPasoActual,

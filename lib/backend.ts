@@ -202,6 +202,9 @@ export interface ZohoPayload {
   navigationHistory?: number[]
   estado?: string
   fecha_completado?: string | null
+  // País/territorio del onboarding ("Chile" | "México"). Campo adicional de la
+  // tropicalización MX: se suma al payload sin alterar el mapeo existente.
+  pais?: string
   totalTrabajadores?: number
   formData: {
     empresa: {
@@ -261,6 +264,7 @@ export interface ZohoPayload {
     configureNow: boolean
   }
   metadata: {
+    pais?: string
     empresaRut: string
     empresaNombre: string
     pasoActual: number
