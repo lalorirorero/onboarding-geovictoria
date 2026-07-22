@@ -164,6 +164,49 @@ export async function POST(request: NextRequest) {
       },
     }
 
+    // IDEMPOTENCIA POR id_zoho (22-jul): el handoff del cotizador y una
+    // automatización legada de Zoho llamaban este endpoint casi en paralelo y
+    // se creaban DOS sesiones para el mismo registro — el cliente terminaba en
+    // la del primer llamador (con datos de ejecutivo desactualizados). Si ya
+    // existe una sesión activa para el id_zoho, NO se crea otra: se fusionan
+    // los datos de empresa (los valores no vacíos del llamador más reciente
+    // pisan a los anteriores) y se devuelve el MISMO token.
+    if (id_zoho) {
+      const existingRes = await supabase
+        .from("onboardings")
+        .select("id, datos_actuales, estado")
+        .eq("id_zoho", id_zoho)
+        .neq("estado", "completado")
+        .order("fecha_creacion", { ascending: false })
+        .limit(1)
+      const existing = existingRes.data?.[0]
+      if (existing) {
+        const datos = existing.datos_actuales || {}
+        const empresaPrev = datos.empresa || {}
+        const empresaNueva: Record<string, unknown> = { ...empresaPrev }
+        for (const [k, v] of Object.entries(formData.empresa)) {
+          const noVacio = Array.isArray(v) ? v.length > 0 : typeof v === "string" ? v.trim() !== "" : v != null
+          if (noVacio) empresaNueva[k] = v
+        }
+        const updateRes = await supabase
+          .from("onboardings")
+          .update({ datos_actuales: { ...datos, empresa: empresaNueva } })
+          .eq("id", existing.id)
+        if (updateRes.error) {
+          console.warn("[v0] generate-link: merge sobre sesión existente falló:", updateRes.error)
+        }
+        const baseUrlExisting = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+        console.log("[v0] generate-link: sesión existente reutilizada:", { id: existing.id, id_zoho })
+        return NextResponse.json({
+          success: true,
+          link: `${baseUrlExisting}?token=${existing.id}`,
+          token: existing.id,
+          tokenExpiresAt: null,
+          reused: true,
+        })
+      }
+    }
+
     let data: any = null
     let error: any = null
 
