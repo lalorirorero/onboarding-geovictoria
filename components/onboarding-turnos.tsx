@@ -127,6 +127,18 @@ const normalizeRut = (rut) => {
 
 const isRutFormatValid = (rut) => /^\d{7,8}-[0-9Kk]$/.test(rut.trim())
 
+// México (22-jul): el auto-onboarding también recibe clientes mexicanos (flujo
+// de pago por transferencia de Vicky MX) y su identificador tributario es el
+// RFC (12 caracteres persona moral / 13 persona física), no el RUT chileno.
+// Para los trabajadores, en México se usa NSS (11 dígitos) o RFC.
+const isValidRfc = (id) =>
+  /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test((id || "").trim().toUpperCase().replace(/[\s.-]/g, ""))
+const isValidNss = (id) => /^\d{11}$/.test((id || "").trim().replace(/[\s.-]/g, ""))
+// Identificador de EMPRESA: RUT chileno válido o RFC mexicano.
+const isValidTaxId = (id) => (isRutFormatValid(id) && isValidRut(id)) || isValidRfc(id)
+// Identificador de TRABAJADOR: RUT chileno, RFC o NSS mexicano.
+const isValidWorkerId = (id) => (isRutFormatValid(id) && isValidRut(id)) || isValidRfc(id) || isValidNss(id)
+
 
 
 const isValidRut = (rut) => {
@@ -213,8 +225,8 @@ const validateEmpresaFields = (empresa: any): { isValid: boolean; errors: string
   if (!empresa.nombreFantasia?.trim()) errors.push("Nombre de fantasía")
   if (!empresa.rut?.trim()) errors.push("RUT")
   if (empresa.rut?.trim()) {
-    const rutRegex = /^[0-9]{7,8}-[0-9Kk]$/
-    if (!rutRegex.test(empresa.rut.trim())) {
+    // RUT chileno (12345678-9) o RFC mexicano (ABC123456XY9).
+    if (!isValidTaxId(empresa.rut.trim())) {
       errors.push("RUT (formato invalido)")
     }
   }
@@ -1498,10 +1510,8 @@ const TrabajadoresStep = ({
 
       if (!rutCompleto.trim()) {
         rowErrors.rut = "El RUT es obligatorio."
-      } else if (!isRutFormatValid(rutCompleto)) {
-        rowErrors.rut = "RUT sin puntos y con guión (ej: 12345678-9)."
-      } else if (!isValidRut(rutCompleto)) {
-        rowErrors.rut = "RUT inválido."
+      } else if (!isValidWorkerId(rutCompleto)) {
+        rowErrors.rut = "Identificador inválido: RUT (12345678-9), RFC o NSS."
       }
 
       if (!correoPersonal.trim()) {
@@ -1990,8 +2000,7 @@ const TrabajadoresStep = ({
               
                 if (!nombre) requiredErrors.nombre = "El nombre es obligatorio."
                 if (!rut) requiredErrors.rut = "El RUT es obligatorio."
-                else if (!isRutFormatValid(rut)) requiredErrors.rut = "RUT sin puntos y con gui?n (ej: 12345678-9)."
-                else if (!isValidRut(rut)) requiredErrors.rut = "RUT inv?lido."
+                else if (!isValidWorkerId(rut)) requiredErrors.rut = "Identificador inválido: RUT (12345678-9), RFC o NSS."
               
                 if (!correo) requiredErrors.correo = "El correo es obligatorio."
                 else if (!isValidEmail(correo)) requiredErrors.correo = "Formato de correo inv?lido."
@@ -5980,7 +5989,7 @@ function OnboardingTurnosCliente() {
             if (err.includes("Razón Social")) stepErrors["empresa.razonSocial"] = "Este campo es obligatorio"
             if (err.includes("Nombre de fantasía")) stepErrors["empresa.nombreFantasia"] = "Este campo es obligatorio"
             if (err.includes("RUT (formato invalido)")) {
-              stepErrors["empresa.rut"] = "Formato invalido (ej: 12345678-9)"
+              stepErrors["empresa.rut"] = "Formato invalido: RUT (12345678-9) o RFC (ABC123456XY9)"
             } else if (err.includes("RUT")) {
               stepErrors["empresa.rut"] = "Este campo es obligatorio"
             }
@@ -6029,7 +6038,7 @@ function OnboardingTurnosCliente() {
         
             if (!nombre) return true
             if (!rut) return true
-            if (!isRutFormatValid(rut) || !isValidRut(rut)) return true
+            if (!isValidWorkerId(rut)) return true
             if (!correo) return true
             if (!isValidEmail(correo)) return true
             if (!t.grupoId) return true
