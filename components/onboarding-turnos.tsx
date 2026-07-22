@@ -139,6 +139,77 @@ const isValidTaxId = (id) => (isRutFormatValid(id) && isValidRut(id)) || isValid
 // Identificador de TRABAJADOR: RUT chileno, RFC o NSS mexicano.
 const isValidWorkerId = (id) => (isRutFormatValid(id) && isValidRut(id)) || isValidRfc(id) || isValidNss(id)
 
+// --- Tropicalización México (22-jul) ---------------------------------------
+// El wizard puede atender onboardings mexicanos (hoja "AutoOnboarding México"
+// del doc de tropicalización). Detección del país del onboarding:
+// 1) Si el registro de la sesión trae un campo explícito de país/territorio, manda ese campo.
+// 2) Si no, se infiere del identificador tributario prefilado: patrón RFC que
+//    NO es un RUT chileno válido => México.
+// 3) Default: Chile (con esMX=false el wizard se comporta exactamente como hoy).
+const detectarPaisOnboarding = (empresa: any): "cl" | "mx" => {
+  const explicito = String(empresa?.pais || empresa?.territorio || empresa?.country || "")
+    .trim()
+    .toLowerCase()
+  if (explicito) {
+    if (explicito === "mx" || explicito === "mex" || explicito.includes("méx") || explicito.includes("mex")) return "mx"
+    if (explicito === "cl" || explicito.includes("chil")) return "cl"
+  }
+  const id = String(empresa?.rut || "").trim()
+  if (id && isValidRfc(id) && !(isRutFormatValid(id) && isValidRut(id))) return "mx"
+  return "cl"
+}
+
+// Glosario es-mx para textos visibles (solo cuando esMX). La detección interna
+// de turnos base ("Libre"/"Descanso") sigue siendo por nombre: esto SOLO cambia
+// lo que se muestra en pantalla.
+const displayTurnoNombre = (nombre: string, esMX: boolean) => {
+  const value = nombre || ""
+  if (!esMX) return value
+  if (value.trim().toLowerCase() === "descanso") return "Día de descanso"
+  return value
+}
+
+// En México la jornada máxima legal 2026 es de 48 horas semanales.
+const MX_JORNADA_MAXIMA_SEMANAL_HORAS = 48
+const MX_JORNADA_WARNING =
+  "En México la jornada máxima legal 2026 es de 48 horas semanales; verifica esta configuración"
+
+// Horas efectivas de un turno (jornada menos tiempo de comida). Turnos base
+// sin horario ("Libre"/"Descanso") aportan 0.
+const horasEfectivasTurno = (turno: any): number => {
+  const toMinutes = (value: string) => {
+    const match = /^(\d{1,2}):(\d{2})$/.exec(String(value || "").trim())
+    if (!match) return null
+    return Number(match[1]) * 60 + Number(match[2])
+  }
+  const inicio = toMinutes(turno?.horaInicio)
+  const fin = toMinutes(turno?.horaFin)
+  if (inicio === null || fin === null) return 0
+  let jornada = fin - inicio
+  if (jornada <= 0) jornada += 24 * 60 // turno nocturno que cruza medianoche
+  let comida = 0
+  if (turno?.tipoColacion === "libre") {
+    comida = Number(turno?.colacionMinutos || 0)
+  } else if (turno?.tipoColacion === "fija") {
+    const cInicio = toMinutes(turno?.colacionInicio)
+    const cFin = toMinutes(turno?.colacionFin)
+    if (cInicio !== null && cFin !== null && cFin > cInicio) comida = cFin - cInicio
+  }
+  const total = jornada - (Number.isFinite(comida) ? comida : 0)
+  return total > 0 ? total / 60 : 0
+}
+
+// Total de horas semanales de una planificación (patrón semanal de turnos).
+const horasSemanalesPlanificacion = (diasTurnos: any[], turnos: any[]): number => {
+  if (!Array.isArray(diasTurnos)) return 0
+  return diasTurnos.reduce((acc, turnoId) => {
+    if (turnoId === null || turnoId === "" || turnoId === undefined) return acc
+    const turno = (turnos || []).find((t) => String(t.id) === String(turnoId))
+    return acc + (turno ? horasEfectivasTurno(turno) : 0)
+  }, 0)
+}
+// ---------------------------------------------------------------------------
+
 
 
 const isValidRut = (rut) => {
@@ -333,7 +404,7 @@ const Stepper = ({ currentStep }) => {
   )
 }
 
-const AdminStep = ({ admins, setAdmins, onRemoveAdmin, isEditMode }) => {
+const AdminStep = ({ admins, setAdmins, onRemoveAdmin, isEditMode, esMX = false }) => {
   const [formData, setFormData] = useState({
     nombre: "",
     apellido: "",
@@ -370,7 +441,12 @@ const AdminStep = ({ admins, setAdmins, onRemoveAdmin, isEditMode }) => {
     }
 
     if (!formData.rut.trim()) {
-      errors.rut = "El RUT es obligatorio"
+      errors.rut = esMX ? "El identificador es obligatorio" : "El RUT es obligatorio"
+    } else if (esMX) {
+      // México: se acepta RFC o NSS (11 dígitos); también RUT por compatibilidad.
+      if (!isValidWorkerId(formData.rut)) {
+        errors.rut = "Formato inválido: RFC (ABC123456XY9) o NSS (11 dígitos)"
+      }
     } else {
       // Validar formato de RUT chileno
       const rutRegex = /^[0-9]{7,8}-[0-9Kk]$/
@@ -501,9 +577,12 @@ const AdminStep = ({ admins, setAdmins, onRemoveAdmin, isEditMode }) => {
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-700">
               <span>
-                RUT <span className="text-destructive">*</span>
+                {esMX ? "RFC o NSS" : "RUT"} <span className="text-destructive">*</span>
               </span>
-              <span className="ml-1 cursor-help text-slate-400" title="Ingresa el RUT sin puntos y con guión">
+              <span
+                className="ml-1 cursor-help text-slate-400"
+                title={esMX ? "Ingresa el RFC o el NSS (11 dígitos)" : "Ingresa el RUT sin puntos y con guión"}
+              >
                 ⓘ
               </span>
             </label>
@@ -516,7 +595,7 @@ const AdminStep = ({ admins, setAdmins, onRemoveAdmin, isEditMode }) => {
               type="text"
               value={formData.rut}
               onChange={(e) => handleFormChange("rut", e.target.value)}
-              placeholder="Ej: 12345678-9"
+              placeholder={esMX ? "Ej: ABCD123456XY9 o 25349543094" : "Ej: 12345678-9"}
             />
             {fieldErrors.rut && (
               <p className="mt-1 flex items-center gap-1 text-xs text-red-600">
@@ -570,7 +649,7 @@ const AdminStep = ({ admins, setAdmins, onRemoveAdmin, isEditMode }) => {
               type="tel"
               value={formData.telefono}
               onChange={(e) => handleFormChange("telefono", e.target.value)}
-              placeholder="Ej: +56912345678"
+              placeholder={esMX ? "Ej: +5215512345678" : "Ej: +56912345678"}
             />
             {fieldErrors.telefono && (
               <p className="mt-1 flex items-center gap-1 text-xs text-red-600">
@@ -605,7 +684,7 @@ const AdminStep = ({ admins, setAdmins, onRemoveAdmin, isEditMode }) => {
                     <span className="text-sm font-medium text-slate-900">{admin.nombre}</span>
                   </div>
                   <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                    {admin.rut && <span>RUT: {admin.rut}</span>}
+                    {admin.rut && <span>{esMX ? "Identificador" : "RUT"}: {admin.rut}</span>}
                     {admin.email && <span>{admin.email}</span>}
                     {admin.telefono && <span>{admin.telefono}</span>}
                   </div>
@@ -699,10 +778,46 @@ const EmpresaStep = React.memo<{
   isFieldEdited: (fieldKey: string) => boolean
   trackFieldChange: (fieldKey: string, newValue: any) => void
   fieldErrors?: Record<string, string> // Nueva prop
-}>(({ empresa, setEmpresa, prefilledFields, isFieldPrefilled, isFieldEdited, trackFieldChange, fieldErrors = {} }) => {
+  esMX?: boolean // Tropicalización MX: labels/placeholder según país
+}>(({ empresa, setEmpresa, prefilledFields, isFieldPrefilled, isFieldEdited, trackFieldChange, fieldErrors = {}, esMX = false }) => {
   const SISTEMAS = ["GeoVictoria BOX", "GeoVictoria CALL", "GeoVictoria APP", "GeoVictoria USB", "GeoVictoria WEB"]
 
-  const SISTEMAS_INFO = {
+  // En MX los métodos se nombran con el vocabulario de la planilla de ingreso
+  // real (Reloj, App individual, Llamada, Web) y se habla de "marcación".
+  const SISTEMAS_INFO = esMX
+    ? {
+        "GeoVictoria BOX": {
+          imagen: "/images/box.png",
+          titulo: "Reloj",
+          descripcion:
+            "Reloj biométrico con huella digital o reconocimiento facial. Ideal para oficinas, plantas y lugares con acceso fijo.",
+        },
+        "GeoVictoria CALL": {
+          imagen: "/images/call.png",
+          titulo: "Llamada",
+          descripcion:
+            "El trabajador registra su marcación llamando a un número gratuito. Ideal para personal en campo sin smartphone o con baja conectividad.",
+        },
+        "GeoVictoria APP": {
+          imagen: "/images/app.png",
+          titulo: "App individual",
+          descripcion:
+            "App para smartphone con geolocalización y foto. Ideal para equipos en campo, vendedores y personal móvil.",
+        },
+        "GeoVictoria USB": {
+          imagen: "/images/usb.png",
+          titulo: "Lector USB Biométrico",
+          descripcion:
+            "Lector de huella conectado a computadora. Ideal para recepciones, escritorios compartidos o puestos de trabajo fijos.",
+        },
+        "GeoVictoria WEB": {
+          imagen: "/images/web.png",
+          titulo: "Web",
+          descripcion:
+            "Marcación desde el navegador con credenciales. Ideal para personal administrativo, teletrabajo y oficinas.",
+        },
+      }
+    : {
     "GeoVictoria BOX": {
       imagen: "/images/box.png",
       titulo: "Relojes Biométricos",
@@ -1001,7 +1116,7 @@ const EmpresaStep = React.memo<{
         />
         <ProtectedInput
           name="nombreFantasia"
-          label="Nombre de fantasía"
+          label={esMX ? "Nombre Comercial" : "Nombre de fantasía"}
           placeholder="Ej: TechSol"
           value={empresa.nombreFantasia || ""}
           onChange={handleEmpresaChange}
@@ -1009,8 +1124,8 @@ const EmpresaStep = React.memo<{
         />
         <ProtectedInput
           name="rut"
-          label="RUT *"
-          placeholder="Ej: 12345678-9"
+          label={esMX ? "RFC *" : "RUT *"}
+          placeholder={esMX ? "Ej: ABC123456XY9" : "Ej: 12345678-9"}
           value={empresa.rut || ""}
           onChange={handleEmpresaChange}
           error={fieldErrors["empresa.rut"]}
@@ -1033,8 +1148,8 @@ const EmpresaStep = React.memo<{
         />
         <ProtectedInput
           name="comuna"
-          label="Comuna *"
-          placeholder="Ej: Santiago"
+          label={esMX ? "Estado *" : "Comuna *"}
+          placeholder={esMX ? "Ej: Ciudad de México" : "Ej: Santiago"}
           value={empresa.comuna || ""}
           onChange={handleEmpresaChange}
           error={fieldErrors["empresa.comuna"]}
@@ -1052,7 +1167,7 @@ const EmpresaStep = React.memo<{
           name="telefonoContacto"
           label="Teléfono de contacto"
           type="tel"
-          placeholder="Ej: +56912345678"
+          placeholder={esMX ? "Ej: +5215512345678" : "Ej: +56912345678"}
           value={empresa.telefonoContacto || ""}
           onChange={handleEmpresaChange}
           error={fieldErrors["empresa.telefonoContacto"]}
@@ -1087,13 +1202,13 @@ const EmpresaStep = React.memo<{
         <header className="mb-4 border-b border-slate-100 pb-3">
           <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
             <Clock className="h-4 w-4 text-sky-500" />
-            Sistema de marcaje
+            {esMX ? "Métodos de marcación" : "Sistema de marcaje"}
           </h3>
           <p className="mt-1 text-sm text-slate-500">Selecciona el o los metodos que usara la empresa para marcar.</p>
         </header>
 
         <label className="block text-sm font-medium text-slate-700 mb-3">
-          Sistema de marcaje <span className="text-slate-900">*</span>
+          {esMX ? "Métodos de marcación" : "Sistema de marcaje"} <span className="text-slate-900">*</span>
         </label>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {SISTEMAS.map((sistema) => {
@@ -1338,6 +1453,7 @@ const TrabajadoresStep = ({
   errorGlobal,
   fieldErrors,
   formData,
+  esMX = false, // Tropicalización MX: labels/ayudas con RFC/NSS y teléfonos +52
 }) => {
   const grupoIdCounter = useRef(Date.now())
   const [isFirstMount, setIsFirstMount] = useState(true)
@@ -1352,7 +1468,7 @@ const TrabajadoresStep = ({
   const bulkWorkerCount = bulkWorkers.length
   const handleDownloadTemplate = () => {
     const headers = [
-      "Rut Completo",
+      esMX ? "Identificador de Usuario / NSS" : "Rut Completo",
       "Correo Personal",
       "Nombres",
       "Apellidos",
@@ -1362,7 +1478,12 @@ const TrabajadoresStep = ({
       "Teléfono 3",
     ]
 
-    const rows = [
+    const rows = esMX
+      ? [
+          ["25349543094", "ana.perez@empresa.mx", "Ana", "Pérez", "Operaciones", "+5215512345678", "", ""],
+          ["92038636616", "luis.rojas@empresa.mx", "Luis", "Rojas", "Ventas Campo", "+5215598765432", "+5215511112222", ""],
+        ]
+      : [
       ["12345678-9", "ana.perez@empresa.cl", "Ana", "Pérez", "Operaciones", "+56912345678", "", ""],
       ["98765432-1", "luis.rojas@empresa.cl", "Luis", "Rojas", "Ventas Terreno", "+56998765432", "+56911112222", ""],
     ]
@@ -1379,7 +1500,18 @@ const TrabajadoresStep = ({
       { wch: 16 },
     ]
 
-    const instructions = [
+    const instructions = esMX
+      ? [
+          ["Instrucciones para usar la plantilla"],
+          ["1) No cambies el orden de las columnas en la hoja Datos."],
+          ["2) Completa cada fila con un trabajador (los encabezados ya están incluidos)."],
+          ["3) Identificador: NSS de 11 dígitos (ej: 25349543094) o RFC (ej: ABCD123456XY9)."],
+          ["4) Grupo: etiqueta para clasificar trabajadores (ej: Operaciones, Tienda Centro, Turno Noche)."],
+          ["5) Teléfono 1 es necesario para el método Llamada (marcación telefónica). Si no lo tienes ahora, puedes completarlo después."],
+          ["6) Teléfonos 2 y 3 son opcionales; si no tienes, deja la celda vacía."],
+          ["7) Para cargar, copia y pega las filas (sin el encabezado) en el formulario."],
+        ]
+      : [
       ["Instrucciones para usar la plantilla"],
       ["1) No cambies el orden de las columnas en la hoja Datos."],
       ["2) Completa cada fila con un trabajador (los encabezados ya están incluidos)."],
@@ -1453,7 +1585,12 @@ const TrabajadoresStep = ({
         const second = (cols[1] || "").toLowerCase()
         const fifth = (cols[4] || "").toLowerCase()
         const looksLikeHeader =
-          first.includes("rut") || second.includes("correo") || fifth.includes("grupo") || first.includes("apellido")
+          first.includes("rut") ||
+          first.includes("identificador") ||
+          first.includes("nss") ||
+          second.includes("correo") ||
+          fifth.includes("grupo") ||
+          first.includes("apellido")
         return !looksLikeHeader
       })
 
@@ -1509,9 +1646,11 @@ const TrabajadoresStep = ({
       }
 
       if (!rutCompleto.trim()) {
-        rowErrors.rut = "El RUT es obligatorio."
+        rowErrors.rut = esMX ? "El identificador es obligatorio." : "El RUT es obligatorio."
       } else if (!isValidWorkerId(rutCompleto)) {
-        rowErrors.rut = "Identificador inválido: RUT (12345678-9), RFC o NSS."
+        rowErrors.rut = esMX
+          ? "Identificador inválido: NSS (11 dígitos) o RFC."
+          : "Identificador inválido: RUT (12345678-9), RFC o NSS."
       }
 
       if (!correoPersonal.trim()) {
@@ -1759,19 +1898,24 @@ const TrabajadoresStep = ({
               Copia celdas desde Excel con las columnas en este orden:
               <span className="font-medium">
                 {" "}
-                Rut Completo, Correo Personal, Nombres, Apellidos, Grupo, Teléfono 1, Teléfono 2, Teléfono 3
+                {esMX
+                  ? "Identificador / NSS, Correo Personal, Nombres, Apellidos, Grupo, Teléfono 1, Teléfono 2, Teléfono 3"
+                  : "Rut Completo, Correo Personal, Nombres, Apellidos, Grupo, Teléfono 1, Teléfono 2, Teléfono 3"}
               </span>
               . Se procesa automáticamente.
             </p>
             
             {isCallSelected ? (
               <p className="text-[11px] text-amber-700 mt-1">
-                Marcaje por Llamada seleccionado: Teléfono 1 es necesario para el marcaje. Si no lo tienes ahora, podrás
-                declararlo al continuar.
+                {esMX
+                  ? "Método Llamada seleccionado: Teléfono 1 es necesario para la marcación. Si no lo tienes ahora, podrás declararlo al continuar."
+                  : "Marcaje por Llamada seleccionado: Teléfono 1 es necesario para el marcaje. Si no lo tienes ahora, podrás declararlo al continuar."}
               </p>
             ) : (
               <p className="text-[11px] text-slate-500 mt-1">
-                Teléfono 1 es opcional si no usas Marcaje por Llamada.
+                {esMX
+                  ? "Teléfono 1 es opcional si no usas el método Llamada."
+                  : "Teléfono 1 es opcional si no usas Marcaje por Llamada."}
               </p>
             )}
 
@@ -1846,7 +1990,11 @@ const TrabajadoresStep = ({
 
         <textarea
           className="mt-2 h-28 w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-mono focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-          placeholder={`Ejemplo de fila pegada:\n18371911-4\t correo@ejemplo.cl\tVICTOR MANUEL ALEJANDRO\tFLORES ESPEJO\tGTS\t+5691234567\t+5691234568\t+5691234569`}
+          placeholder={
+            esMX
+              ? `Ejemplo de fila pegada:\n25349543094\t correo@ejemplo.mx\tVICTOR MANUEL ALEJANDRO\tFLORES ESPEJO\tGTS\t+5215512345678\t+5215512345679\t+5215512345680`
+              : `Ejemplo de fila pegada:\n18371911-4\t correo@ejemplo.cl\tVICTOR MANUEL ALEJANDRO\tFLORES ESPEJO\tGTS\t+5691234567\t+5691234568\t+5691234569`
+          }
           value={bulkText}
           onChange={(e) => {
             setBulkText(e.target.value)
@@ -1903,7 +2051,9 @@ const TrabajadoresStep = ({
                   <li>
                     Asegúrate de que las columnas estén en el orden correcto:{" "}
                     <span className="font-medium">
-                      Rut Completo, Correo Personal, Nombres, Apellidos, Grupo, Teléfono 1, Teléfono 2, Teléfono 3
+                      {esMX
+                        ? "Identificador / NSS, Correo Personal, Nombres, Apellidos, Grupo, Teléfono 1, Teléfono 2, Teléfono 3"
+                        : "Rut Completo, Correo Personal, Nombres, Apellidos, Grupo, Teléfono 1, Teléfono 2, Teléfono 3"}
                     </span>
                   </li>
                   <li>Copia las celdas seleccionadas (Ctrl+C o Cmd+C)</li>
@@ -1911,7 +2061,9 @@ const TrabajadoresStep = ({
                   <li>Los trabajadores se agregarán automáticamente a la tabla</li>
                 </ol>
                 <p className="text-sky-700 italic mt-2">
-                  Nota: Teléfono 1 es necesario para Marcaje por Llamada. Teléfonos 2 y 3 son opcionales.
+                  {esMX
+                    ? "Nota: Teléfono 1 es necesario para el método Llamada. Teléfonos 2 y 3 son opcionales."
+                    : "Nota: Teléfono 1 es necesario para Marcaje por Llamada. Teléfonos 2 y 3 son opcionales."}
                 </p>
               </div>
 
@@ -1963,7 +2115,7 @@ const TrabajadoresStep = ({
             <tr>
               <th className="px-3 py-2 text-left font-medium text-slate-700">Tipo</th>
               <th className="px-3 py-2 text-left font-medium text-slate-700">Nombre</th>
-              <th className="px-3 py-2 text-left font-medium text-slate-700">RUT</th>
+              <th className="px-3 py-2 text-left font-medium text-slate-700">{esMX ? "Identificador / NSS" : "RUT"}</th>
               <th className="px-3 py-2 text-left font-medium text-slate-700">Correo</th>
               <th className="px-3 py-2 text-left font-medium text-slate-700">
                 <span className="inline-flex items-center gap-1">
@@ -1999,8 +2151,11 @@ const TrabajadoresStep = ({
                 const correo = t.correo?.trim() || ""
               
                 if (!nombre) requiredErrors.nombre = "El nombre es obligatorio."
-                if (!rut) requiredErrors.rut = "El RUT es obligatorio."
-                else if (!isValidWorkerId(rut)) requiredErrors.rut = "Identificador inválido: RUT (12345678-9), RFC o NSS."
+                if (!rut) requiredErrors.rut = esMX ? "El identificador es obligatorio." : "El RUT es obligatorio."
+                else if (!isValidWorkerId(rut))
+                  requiredErrors.rut = esMX
+                    ? "Identificador inválido: NSS (11 dígitos) o RFC."
+                    : "Identificador inválido: RUT (12345678-9), RFC o NSS."
               
                 if (!correo) requiredErrors.correo = "El correo es obligatorio."
                 else if (!isValidEmail(correo)) requiredErrors.correo = "Formato de correo inv?lido."
@@ -2055,7 +2210,7 @@ const TrabajadoresStep = ({
                       type="text"
                       value={t.rut}
                       onChange={(e) => updateTrabajador(t.id, "rut", e.target.value)}
-                      placeholder="Ej: 18435922-7"
+                      placeholder={esMX ? "Ej: 25349543094" : "Ej: 18435922-7"}
                       disabled={isAdmin}
                     />
                     {rowErrors.rut && <p className="mt-0.5 text-[10px] text-red-600">{rowErrors.rut}</p>}
@@ -2096,7 +2251,7 @@ const TrabajadoresStep = ({
                       type="tel"
                       value={t.telefono1 || ""}
                       onChange={(e) => updateTrabajador(t.id, "telefono1", e.target.value)}
-                      placeholder="Ej: +5691234567"
+                      placeholder={esMX ? "Ej: +5215512345678" : "Ej: +5691234567"}
                       disabled={isAdmin}
                     />
                     {telefono1Error && <p className="mt-0.5 text-[10px] text-red-600">{telefono1Error}</p>}
@@ -2109,7 +2264,7 @@ const TrabajadoresStep = ({
                       type="tel"
                       value={t.telefono2 || ""}
                       onChange={(e) => updateTrabajador(t.id, "telefono2", e.target.value)}
-                      placeholder="Ej: +5691234567"
+                      placeholder={esMX ? "Ej: +5215512345678" : "Ej: +5691234567"}
                       disabled={isAdmin}
                     />
                     {rowErrors.telefono2 && <p className="mt-0.5 text-[10px] text-red-600">{rowErrors.telefono2}</p>}
@@ -2122,7 +2277,7 @@ const TrabajadoresStep = ({
                       type="tel"
                       value={t.telefono3 || ""}
                       onChange={(e) => updateTrabajador(t.id, "telefono3", e.target.value)}
-                      placeholder="Ej: +5691234567"
+                      placeholder={esMX ? "Ej: +5215512345678" : "Ej: +5691234567"}
                       disabled={isAdmin}
                     />
                     {rowErrors.telefono3 && <p className="mt-0.5 text-[10px] text-red-600">{rowErrors.telefono3}</p>}
@@ -2168,7 +2323,10 @@ const TrabajadoresStep = ({
   )
 }
 
-const TurnosStep = ({ turnos, setTurnos }) => {
+const TurnosStep = ({ turnos, setTurnos, esMX = false }) => {
+  // Vocabulario MX: en México el tiempo de descanso dentro del turno se llama
+  // "horario de comida" (planilla real: "Comida (minutos)"), no "colación".
+  const comidaLabel = esMX ? "comida" : "colación"
   const [formTurno, setFormTurno] = React.useState({
     nombre: "",
     horaInicio: "",
@@ -2190,14 +2348,14 @@ const TurnosStep = ({ turnos, setTurnos }) => {
     if (formTurno.tipoColacion === "libre") {
       const minutos = Number(formTurno.colacionMinutos)
       if (!formTurno.colacionMinutos || Number.isNaN(minutos) || minutos <= 0) {
-        alert("Debes ingresar los minutos de colación libre.")
+        alert(`Debes ingresar los minutos de ${comidaLabel} libre.`)
         return
       }
     }
 
     if (formTurno.tipoColacion === "fija") {
       if (!formTurno.colacionInicio || !formTurno.colacionFin) {
-        alert("Debes ingresar hora de inicio y fin para colación fija.")
+        alert(`Debes ingresar hora de inicio y fin para ${comidaLabel} fija.`)
         return
       }
     }
@@ -2235,16 +2393,33 @@ const TurnosStep = ({ turnos, setTurnos }) => {
         <h2 className="text-lg font-semibold text-slate-900">Turnos</h2>
         <div className="mt-2 space-y-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
           <p className="text-sm font-medium text-blue-900">&iquest;Qu&eacute; es un turno?</p>
-          <p className="text-xs text-blue-800 leading-relaxed">
-            Un <strong>turno</strong> es un bloque de horario laboral con hora de inicio, hora de t&eacute;rmino y tiempo de
-            colaci&oacute;n. Por ejemplo: "Turno Oficina" de 09:00 a 18:00 con 60 minutos de colaci&oacute;n, o "Turno Noche" de 22:00
-            a 06:00 con 30 minutos de colaci&oacute;n.
-          </p>
-          <p className="text-xs text-blue-800 leading-relaxed">
-            Ya tienes turnos base: <strong>Libre</strong> y <strong>Descanso</strong>.
-            <strong>Descanso</strong> es recomendado para fines de semana o d&iacute;as no laborables, y <strong>Libre</strong> para
-            personas sin horario fijo.
-          </p>
+          {esMX ? (
+            <>
+              <p className="text-xs text-blue-800 leading-relaxed">
+                Un <strong>turno</strong> es un bloque de horario laboral con hora de inicio, hora de t&eacute;rmino y horario de
+                comida. Por ejemplo: "Turno Oficina" de 09:00 a 18:00 con 60 minutos de comida, o "Turno Noche" de 22:00
+                a 06:00 con 30 minutos de comida.
+              </p>
+              <p className="text-xs text-blue-800 leading-relaxed">
+                Ya tienes turnos base: <strong>Libre</strong> y <strong>D&iacute;a de descanso</strong>.
+                <strong> D&iacute;a de descanso</strong> es recomendado para fines de semana o d&iacute;as no laborables, y{" "}
+                <strong>Libre</strong> para personas sin horario fijo.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-blue-800 leading-relaxed">
+                Un <strong>turno</strong> es un bloque de horario laboral con hora de inicio, hora de t&eacute;rmino y tiempo de
+                colaci&oacute;n. Por ejemplo: "Turno Oficina" de 09:00 a 18:00 con 60 minutos de colaci&oacute;n, o "Turno Noche" de 22:00
+                a 06:00 con 30 minutos de colaci&oacute;n.
+              </p>
+              <p className="text-xs text-blue-800 leading-relaxed">
+                Ya tienes turnos base: <strong>Libre</strong> y <strong>Descanso</strong>.
+                <strong>Descanso</strong> es recomendado para fines de semana o d&iacute;as no laborables, y <strong>Libre</strong> para
+                personas sin horario fijo.
+              </p>
+            </>
+          )}
           <p className="text-xs text-blue-800 leading-relaxed">
             En el siguiente paso crear&aacute;s <strong>planificaciones</strong> combinando estos turnos por d&iacute;a de la semana.
             Luego, en <strong>asignaciones</strong>, elegir&aacute;s qu&eacute; planificaci&oacute;n aplica a cada trabajador.
@@ -2289,7 +2464,7 @@ const TurnosStep = ({ turnos, setTurnos }) => {
         </div>
 
         <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-          <label className="text-sm font-medium">Tipo de colación</label>
+          <label className="text-sm font-medium">{esMX ? "Horario de comida" : "Tipo de colación"}</label>
           <div className="grid gap-2 md:grid-cols-3">
             <button
               type="button"
@@ -2300,7 +2475,7 @@ const TurnosStep = ({ turnos, setTurnos }) => {
                   : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
               }`}
             >
-              Sin Colación
+              {esMX ? "Sin comida" : "Sin Colación"}
             </button>
             <button
               type="button"
@@ -2311,7 +2486,7 @@ const TurnosStep = ({ turnos, setTurnos }) => {
                   : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
               }`}
             >
-              Colación Libre
+              {esMX ? "Comida libre" : "Colación Libre"}
             </button>
             <button
               type="button"
@@ -2322,13 +2497,13 @@ const TurnosStep = ({ turnos, setTurnos }) => {
                   : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
               }`}
             >
-              Colación Fija
+              {esMX ? "Comida fija" : "Colación Fija"}
             </button>
           </div>
 
           {formTurno.tipoColacion === "libre" && (
             <div className="space-y-1 text-sm">
-              <label className="font-medium">Tiempo de colación (minutos)</label>
+              <label className="font-medium">{esMX ? "Comida (minutos)" : "Tiempo de colación (minutos)"}</label>
               <input
                 className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                 type="number"
@@ -2343,7 +2518,7 @@ const TurnosStep = ({ turnos, setTurnos }) => {
           {formTurno.tipoColacion === "fija" && (
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1 text-sm">
-                <label className="font-medium">Inicio colación</label>
+                <label className="font-medium">{esMX ? "Inicio comida" : "Inicio colación"}</label>
                 <input
                   className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                   type="time"
@@ -2352,7 +2527,7 @@ const TurnosStep = ({ turnos, setTurnos }) => {
                 />
               </div>
               <div className="space-y-1 text-sm">
-                <label className="font-medium">Término colación</label>
+                <label className="font-medium">{esMX ? "Término comida" : "Término colación"}</label>
                 <input
                   className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                   type="time"
@@ -2395,7 +2570,7 @@ const TurnosStep = ({ turnos, setTurnos }) => {
               >
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-semibold text-slate-900">{turno.nombre}</h4>
+                    <h4 className="text-sm font-semibold text-slate-900">{displayTurnoNombre(turno.nombre, esMX)}</h4>
                     {turno.tooltip && <span className="text-xs text-slate-500">({turno.tooltip})</span>}
                   </div>
                   <div className="flex flex-wrap gap-3 text-xs text-slate-600">
@@ -2406,17 +2581,17 @@ const TurnosStep = ({ turnos, setTurnos }) => {
                     )}
                     {turno.tipoColacion === "sin" && (
                       <span>
-                        <strong>Colación:</strong> Sin colación
+                        <strong>{esMX ? "Comida:" : "Colación:"}</strong> {esMX ? "Sin comida" : "Sin colación"}
                       </span>
                     )}
                     {turno.tipoColacion === "libre" && turno.colacionMinutos > 0 && (
                       <span>
-                        <strong>Colación libre:</strong> {turno.colacionMinutos} min
+                        <strong>{esMX ? "Comida libre:" : "Colación libre:"}</strong> {turno.colacionMinutos} min
                       </span>
                     )}
                     {turno.tipoColacion === "fija" && turno.colacionInicio && turno.colacionFin && (
                       <span>
-                        <strong>Colación fija:</strong> {turno.colacionInicio} - {turno.colacionFin}
+                        <strong>{esMX ? "Comida fija:" : "Colación fija:"}</strong> {turno.colacionInicio} - {turno.colacionFin}
                       </span>
                     )}
                   </div>
@@ -2566,7 +2741,7 @@ const GruposStep = ({ grupos, setGrupos }) => {
   )
 }
 
-const PlanificacionesStep = ({ planificaciones, setPlanificaciones, turnos }) => {
+const PlanificacionesStep = ({ planificaciones, setPlanificaciones, turnos, esMX = false }) => {
   const [formData, setFormData] = useState({
     nombre: "",
     diasTurnos: Array(7).fill(null),
@@ -2697,7 +2872,7 @@ const PlanificacionesStep = ({ planificaciones, setPlanificaciones, turnos }) =>
                         <option value="">Seleccionar</option>
                         {turnos.map((turno) => (
                           <option key={turno.id} value={turno.id}>
-                            {turno.nombre || "Sin nombre"}
+                            {displayTurnoNombre(turno.nombre, esMX) || "Sin nombre"}
                           </option>
                         ))}
                       </select>
@@ -2714,6 +2889,16 @@ const PlanificacionesStep = ({ planificaciones, setPlanificaciones, turnos }) =>
                 <span className="text-amber-700 font-medium">⚠ Todos los días deben tener un turno asignado</span>
               )}
             </div>
+
+            {/* Advertencia MX (no bloqueante): jornada semanal sobre el máximo legal */}
+            {esMX &&
+              horasSemanalesPlanificacion(formData.diasTurnos, turnos) > MX_JORNADA_MAXIMA_SEMANAL_HORAS && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
+                  <strong>Advertencia:</strong> esta configuración suma{" "}
+                  {horasSemanalesPlanificacion(formData.diasTurnos, turnos).toFixed(1)} horas semanales.{" "}
+                  {MX_JORNADA_WARNING}.
+                </div>
+              )}
           </div>
           <button
             type="button"
@@ -2732,6 +2917,8 @@ const PlanificacionesStep = ({ planificaciones, setPlanificaciones, turnos }) =>
           <div className="space-y-3">
             {planificaciones.map((plan) => {
               const esCompleta = verificarPlanificacionCompleta(plan.diasTurnos)
+              const horasSemanales = esMX ? horasSemanalesPlanificacion(plan.diasTurnos, turnos) : 0
+              const excedeJornadaMx = esMX && horasSemanales > MX_JORNADA_MAXIMA_SEMANAL_HORAS
               return (
                 <div key={plan.id} className="rounded-xl border border-slate-200 bg-white p-3 hover:bg-slate-50">
                   <div className="flex items-start justify-between mb-2">
@@ -2744,6 +2931,11 @@ const PlanificacionesStep = ({ planificaciones, setPlanificaciones, turnos }) =>
                           <span className="text-amber-700 font-medium">⚠ Incompleta</span>
                         )}
                       </div>
+                      {excedeJornadaMx && (
+                        <div className="mt-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+                          <strong>Advertencia:</strong> {horasSemanales.toFixed(1)} horas semanales. {MX_JORNADA_WARNING}.
+                        </div>
+                      )}
                     </div>
                     <button
                       type="button"
@@ -2768,7 +2960,9 @@ const PlanificacionesStep = ({ planificaciones, setPlanificaciones, turnos }) =>
                       return (
                         <div key={dayIndex} className="text-center">
                           <div className="font-medium text-slate-600 mb-0.5">{dia}</div>
-                          <div className="rounded bg-slate-100 px-1 py-0.5 text-slate-700">{turno?.nombre || "-"}</div>
+                          <div className="rounded bg-slate-100 px-1 py-0.5 text-slate-700">
+                            {displayTurnoNombre(turno?.nombre, esMX) || "-"}
+                          </div>
                         </div>
                       )
                     })}
@@ -2806,7 +3000,7 @@ const PlanificacionesStep = ({ planificaciones, setPlanificaciones, turnos }) =>
                   return (
                     <li key={turno.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-semibold text-slate-800">{nombre}</span>
+                        <span className="text-xs font-semibold text-slate-800">{displayTurnoNombre(nombre, esMX)}</span>
                         {isBase && (
                           <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-600">
                             Base
@@ -2816,11 +3010,15 @@ const PlanificacionesStep = ({ planificaciones, setPlanificaciones, turnos }) =>
                       <p className="text-[11px] text-slate-500">{horario}</p>
                       <p className="text-[11px] text-slate-500">
                         {turno.tipoColacion === "libre" ? (
-                          <span>{turno.colacionMinutos || 0} min de colaci&oacute;n libre</span>
+                          <span>
+                            {turno.colacionMinutos || 0} min de {esMX ? "comida" : "colación"} libre
+                          </span>
                         ) : turno.tipoColacion === "fija" ? (
-                          <span>Colaci&oacute;n fija {turno.colacionInicio || "--:--"} - {turno.colacionFin || "--:--"}</span>
+                          <span>
+                            {esMX ? "Comida" : "Colación"} fija {turno.colacionInicio || "--:--"} - {turno.colacionFin || "--:--"}
+                          </span>
                         ) : (
-                          <span>Sin colaci&oacute;n</span>
+                          <span>{esMX ? "Sin comida" : "Sin colación"}</span>
                         )}
                       </p>
                     </li>
@@ -4772,12 +4970,14 @@ const AntesDeComenzarStep = ({
   complianceState,
   complianceErrors,
   onComplianceChange,
+  esMX = false,
 }: {
   onContinue: () => void
   onBack: () => void
   complianceState: BeforeStartComplianceState
   complianceErrors: Partial<Record<keyof BeforeStartComplianceState, string>>
   onComplianceChange: (field: keyof BeforeStartComplianceState, value: boolean) => void
+  esMX?: boolean
 }) => {
   return (
     <section className="space-y-6 max-w-[1700px] mx-auto">
@@ -4800,12 +5000,16 @@ const AntesDeComenzarStep = ({
             <p className="text-sm font-semibold text-slate-800">Obligatorio para continuar</p>
             <ul className="space-y-2 text-xs text-slate-600">
               <li>
-                <span className="font-medium text-slate-700">Empresa:</span> Razón social, RUT, dirección, comuna,
-                giro, rubro, teléfono de contacto, email de facturación y sistema de marcaje.
+                <span className="font-medium text-slate-700">Empresa:</span>{" "}
+                {esMX
+                  ? "Razón social, RFC, dirección, estado, giro, rubro, teléfono de contacto, email de facturación y métodos de marcación."
+                  : "Razón social, RUT, dirección, comuna, giro, rubro, teléfono de contacto, email de facturación y sistema de marcaje."}
               </li>
               <li>
-                <span className="font-medium text-slate-700">Administrador principal:</span> nombre, apellido, RUT,
-                correo y teléfono.
+                <span className="font-medium text-slate-700">Administrador principal:</span>{" "}
+                {esMX
+                  ? "nombre, apellido, RFC o NSS, correo y teléfono."
+                  : "nombre, apellido, RUT, correo y teléfono."}
               </li>
             </ul>
           </div>
@@ -4813,9 +5017,10 @@ const AntesDeComenzarStep = ({
             <p className="text-sm font-semibold text-slate-800">Opcional por ahora</p>
             <ul className="space-y-2 text-xs text-slate-600">
               <li>
-                <span className="font-medium text-slate-700">Trabajadores:</span> nombre, RUT, correo y grupo (se
-                cargan en el paso Trabajadores). Si eliges Marcaje por Llamada, necesitarás el Teléfono 1 para que
-                puedan marcar.
+                <span className="font-medium text-slate-700">Trabajadores:</span>{" "}
+                {esMX
+                  ? "nombre, identificador (NSS o RFC), correo y grupo (se cargan en el paso Trabajadores). Si eliges el método Llamada, necesitarás el Teléfono 1 para que puedan registrar su marcación."
+                  : "nombre, RUT, correo y grupo (se cargan en el paso Trabajadores). Si eliges Marcaje por Llamada, necesitarás el Teléfono 1 para que puedan marcar."}
               </li>
               <li>
                 <span className="font-medium text-slate-700">Turnos y planificaciones:</span> solo si decides
@@ -4853,11 +5058,15 @@ const AntesDeComenzarStep = ({
           <ul className="space-y-2 text-sm text-amber-700">
             <li className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-              Prepara tu lista de trabajadores: nombre, RUT, correo y grupo.
+              {esMX
+                ? "Prepara tu lista de trabajadores: nombre, identificador (NSS o RFC), correo y grupo."
+                : "Prepara tu lista de trabajadores: nombre, RUT, correo y grupo."}
             </li>
             <li className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-              Si usarás Marcaje por Llamada: Teléfono 1 de cada trabajador.
+              {esMX
+                ? "Si usarás el método Llamada: Teléfono 1 de cada trabajador."
+                : "Si usarás Marcaje por Llamada: Teléfono 1 de cada trabajador."}
             </li>
             <li className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
@@ -4870,15 +5079,42 @@ const AntesDeComenzarStep = ({
       <div id="before-start-compliance" className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
         <div id="privacy-legal-summary" className="space-y-2">
           <h3 className="font-semibold text-slate-900">Resumen legal y privacidad</h3>
-          <p className="text-sm text-slate-600">
-            Tratamos los datos para habilitar tu onboarding, configurar tu empresa y coordinar la implementacion.
-            Compartimos datos con sistemas operativos como Zoho CRM/Flow y proveedores tecnologicos bajo medidas de
-            seguridad. Puedes ejercer derechos de acceso, rectificacion, supresion, oposicion, portabilidad y bloqueo.
-          </p>
-          <p className="text-sm text-slate-600">
-            Responsable: GeoVictoria. Base principal: ejecucion contractual o medidas precontractuales. Comunicaciones
-            comerciales solo con aceptacion separada.
-          </p>
+          {esMX ? (
+            <>
+              <p className="text-sm text-slate-600">
+                Tratamos los datos para habilitar tu onboarding, configurar tu empresa y coordinar la implementacion,
+                conforme a la Ley Federal de Proteccion de Datos Personales en Posesion de los Particulares (LFPDPPP) y
+                a la Ley Federal del Trabajo. Compartimos datos con sistemas operativos como Zoho CRM/Flow y proveedores
+                tecnologicos bajo medidas de seguridad. Puedes ejercer tus derechos ARCO: acceso, rectificacion,
+                cancelacion y oposicion.
+              </p>
+              <p className="text-sm text-slate-600">
+                Responsable: GeoVictoria. Base principal: ejecucion contractual o medidas precontractuales. Consulta el
+                aviso de privacidad en{" "}
+                <a
+                  href={PRIVACY_POLICY_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sky-700 hover:underline font-medium"
+                >
+                  {PRIVACY_POLICY_URL}
+                </a>
+                . Comunicaciones comerciales solo con aceptacion separada.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-slate-600">
+                Tratamos los datos para habilitar tu onboarding, configurar tu empresa y coordinar la implementacion.
+                Compartimos datos con sistemas operativos como Zoho CRM/Flow y proveedores tecnologicos bajo medidas de
+                seguridad. Puedes ejercer derechos de acceso, rectificacion, supresion, oposicion, portabilidad y bloqueo.
+              </p>
+              <p className="text-sm text-slate-600">
+                Responsable: GeoVictoria. Base principal: ejecucion contractual o medidas precontractuales. Comunicaciones
+                comerciales solo con aceptacion separada.
+              </p>
+            </>
+          )}
           <details className="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <summary className="cursor-pointer text-sm font-medium text-sky-700">
               Ver politica de privacidad resumida
@@ -4896,12 +5132,13 @@ const AntesDeComenzarStep = ({
                 anonimiza.
               </p>
               <p>
-                Derechos: puedes solicitar acceso, rectificacion, supresion, oposicion, portabilidad o bloqueo por los
-                canales oficiales de privacidad.
+                {esMX
+                  ? "Derechos ARCO: puedes solicitar acceso, rectificacion, cancelacion u oposicion por los canales oficiales de privacidad, conforme a la LFPDPPP."
+                  : "Derechos: puedes solicitar acceso, rectificacion, supresion, oposicion, portabilidad o bloqueo por los canales oficiales de privacidad."}
               </p>
               <p className="text-[11px] text-slate-500">Version de referencia: {PRIVACY_POLICY_VERSION}</p>
               <p className="text-[11px] text-slate-500">
-                Politica completa:{" "}
+                {esMX ? "Aviso de privacidad:" : "Politica completa:"}{" "}
                 <a
                   href={PRIVACY_POLICY_URL}
                   target="_blank"
@@ -5287,6 +5524,26 @@ function OnboardingTurnosCliente() {
   const [navigationHistory, setNavigationHistory] = useState([PRIMER_PASO])
   const [onboardingId, setOnboardingId] = useState<string | null>(null)
   const [idZoho, setIdZoho] = useState<string>("")
+
+  // País del onboarding (tropicalización MX). Se fija al hidratar la sesión del
+  // token y además se re-deriva del identificador de la empresa (por si el RFC
+  // se escribe durante el flujo). Sobrevive la navegación: formData vive en el
+  // estado del wizard y en la BD. Con esMX=false todo queda igual que hoy.
+  const [paisSesion, setPaisSesion] = useState<"cl" | "mx">("cl")
+  const esMX = paisSesion === "mx" || detectarPaisOnboarding(formData?.empresa) === "mx"
+
+  // Traduce los mensajes de campos faltantes de Empresa al vocabulario MX.
+  // Los strings internos (claves de matching en handleNext) no cambian: esto
+  // aplica SOLO al texto visible.
+  const traducirErrorEmpresa = (err: string) => {
+    if (!esMX) return err
+    return err
+      .replace("Nombre de fantasía", "Nombre Comercial")
+      .replace("RUT (formato invalido)", "RFC (formato invalido)")
+      .replace("RUT", "RFC")
+      .replace("Comuna", "Estado")
+      .replace("Sistema de marcaje", "Métodos de marcación")
+  }
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [grupos, setGrupos] = useState<Grupo[]>([])
   const [trabajadores, setTrabajadores] = useState<Trabajador[]>([])
@@ -5610,12 +5867,16 @@ function OnboardingTurnosCliente() {
             if (result.formData) {
               console.log("[v0] Cargando formData:", result.formData)
               // Ensure default turns are present if not in loaded data
-              loadedFormData = {
+              const hydrated = {
                 ...result.formData,
                 empresa: normalizeEmpresaModulos(result.formData.empresa || getEmptyEmpresa()),
                 turnos: result.formData.turnos?.length ? result.formData.turnos : DEFAULT_TURNOS,
               }
-              setFormData(loadedFormData)
+              loadedFormData = hydrated
+              setFormData(hydrated)
+              // Tropicalización MX: fija el país de la sesión a partir del
+              // payload prefilado (campo explícito de país o RFC de la empresa).
+              setPaisSesion(detectarPaisOnboarding(hydrated.empresa))
             }
 
             if (result.compliance) {
@@ -5874,8 +6135,12 @@ function OnboardingTurnosCliente() {
         id_zoho: idZoho,
         onboardingId: onboardingId,
         fechaHoraEnvio: new Date().toISOString(),
+        // Tropicalización MX: país/territorio del onboarding (campo adicional,
+        // no altera el mapeo existente en Zoho).
+        pais: esMX ? "México" : "Chile",
         formData: updatedFormData,
         metadata: {
+          pais: esMX ? "México" : "Chile",
           empresaRut: formData.empresa.rut || "Sin RUT",
           empresaNombre: formData.empresa.razonSocial || formData.empresa.nombreFantasia || "Sin nombre",
           pasoActual: 11,
@@ -5999,7 +6264,9 @@ function OnboardingTurnosCliente() {
             if (err.includes("Teléfono")) stepErrors["empresa.telefonoContacto"] = "Este campo es obligatorio"
             if (err.includes("Rubro")) stepErrors["empresa.rubro"] = "Este campo es obligatorio"
             if (err.includes("Sistema"))
-              stepErrors["empresa.sistema"] = "Debes seleccionar al menos un sistema de marcaje"
+              stepErrors["empresa.sistema"] = esMX
+                ? "Debes seleccionar al menos un método de marcación"
+                : "Debes seleccionar al menos un sistema de marcaje"
             if (err.includes("Modulos adicionales (Otro)"))
               stepErrors["empresa.modulosAdicionalesOtro"] = "Debes especificar el modulo en Otro"
             if (err.includes("Email de facturación (formato inválido)")) {
@@ -6052,7 +6319,11 @@ function OnboardingTurnosCliente() {
 
         if (trabajadoresInvalidos.length > 0) {
           isValid = false
-          errors.push("Hay trabajadores con datos inv?lidos. Revisa nombre, RUT, correo, grupo y tel?fonos.")
+          errors.push(
+            esMX
+              ? "Hay trabajadores con datos inválidos. Revisa nombre, identificador (NSS o RFC), correo, grupo y teléfonos."
+              : "Hay trabajadores con datos inv?lidos. Revisa nombre, RUT, correo, grupo y tel?fonos.",
+          )
           break
         }
 
@@ -6228,8 +6499,11 @@ function OnboardingTurnosCliente() {
           id_zoho: idZoho,
           onboardingId: onboardingId,
           fechaHoraEnvio: new Date().toISOString(),
+          // País/territorio del onboarding (campo adicional para Zoho).
+          pais: esMX ? "México" : "Chile",
           formData: updatedFormData,
           metadata: {
+            pais: esMX ? "México" : "Chile",
             empresaRut: formData.empresa.rut || "Sin RUT",
             empresaNombre: formData.empresa.razonSocial || formData.empresa.nombreFantasia || "Sin nombre",
             pasoActual: nextStep,
@@ -6442,6 +6716,7 @@ function OnboardingTurnosCliente() {
               complianceState={beforeStartCompliance}
               complianceErrors={beforeStartComplianceErrors}
               onComplianceChange={handleBeforeStartComplianceChange}
+              esMX={esMX}
             />
           </>
         )
@@ -6460,7 +6735,7 @@ function OnboardingTurnosCliente() {
                       {validationErrors.map((error, idx) => (
                         <li key={idx} className="flex items-center gap-2">
                           <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-600"></span>
-                          {error}
+                          {traducirErrorEmpresa(error)}
                         </li>
                       ))}
                     </ul>
@@ -6472,6 +6747,7 @@ function OnboardingTurnosCliente() {
             <EmpresaStep
               empresa={formData.empresa}
               setEmpresa={setEmpresa}
+              esMX={esMX}
               prefilledFields={prefilledFields}
               isFieldPrefilled={isFieldPrefilled}
               isFieldEdited={isFieldEdited}
@@ -6517,6 +6793,7 @@ function OnboardingTurnosCliente() {
               }}
               onRemoveAdmin={removeAdmin}
               isEditMode={false}
+              esMX={esMX}
             />
             <NavigationButtons />
           </div>
@@ -6535,8 +6812,16 @@ function OnboardingTurnosCliente() {
                 <h3 className="mb-2 text-base font-semibold text-slate-900">Antes de continuar</h3>
                 <ul className="space-y-2 text-sm text-slate-700">
                   <li>Debes cargar mínimo 1 trabajador no administrador.</li>
-                  <li>Si usas Marcaje por Llamada, ese trabajador debe tener Teléfono 1.</li>
-                  <li>Los datos mínimos son: nombre, RUT, correo y grupo.</li>
+                  <li>
+                    {esMX
+                      ? "Si usas el método Llamada, ese trabajador debe tener Teléfono 1."
+                      : "Si usas Marcaje por Llamada, ese trabajador debe tener Teléfono 1."}
+                  </li>
+                  <li>
+                    {esMX
+                      ? "Los datos mínimos son: nombre, identificador (NSS o RFC), correo y grupo."
+                      : "Los datos mínimos son: nombre, RUT, correo y grupo."}
+                  </li>
                 </ul>
               </div>
             </section>
@@ -6574,6 +6859,7 @@ function OnboardingTurnosCliente() {
                 fieldErrors={fieldErrors} // Pass fieldErrors down
                 formData={formData} // Pass formData down
                 ensureGrupoByName={ensureGrupoByName}
+                esMX={esMX}
               />
             </StepErrorBoundary>
             <NavigationButtons />
@@ -6593,6 +6879,7 @@ function OnboardingTurnosCliente() {
             <TurnosStep
               turnos={formData.turnos}
               setTurnos={(newTurnos) => setFormData((prev) => ({ ...prev, turnos: newTurnos }))}
+              esMX={esMX}
             />
             <SalidaTurnosBanner />
             <NavigationButtons />
@@ -6607,6 +6894,7 @@ function OnboardingTurnosCliente() {
                 setFormData((prev) => ({ ...prev, planificaciones: newPlanificaciones }))
               }
               turnos={formData.turnos}
+              esMX={esMX}
             />
             <SalidaTurnosBanner />
             <NavigationButtons />
@@ -6678,10 +6966,10 @@ function OnboardingTurnosCliente() {
                   <strong>Razón Social:</strong> {formData.empresa.razonSocial}
                 </p>
                 <p>
-                  <strong>Nombre Fantasía:</strong> {formData.empresa.nombreFantasia}
+                  <strong>{esMX ? "Nombre Comercial:" : "Nombre Fantasía:"}</strong> {formData.empresa.nombreFantasia}
                 </p>
                 <p>
-                  <strong>RUT:</strong> {formData.empresa.rut}
+                  <strong>{esMX ? "RFC:" : "RUT:"}</strong> {formData.empresa.rut}
                 </p>
                 <p>
                   <strong>Giro:</strong> {formData.empresa.giro}
@@ -6716,7 +7004,7 @@ function OnboardingTurnosCliente() {
                   <ul>
                     {formData.admins.map((admin, index) => (
                       <li key={admin.id || index} className="mb-2 text-sm">
-                        <strong>{admin.nombre}</strong> (RUT: {admin.rut}, Email: {admin.email}, Tel: {admin.telefono})
+                        <strong>{admin.nombre}</strong> ({esMX ? "Identificador" : "RUT"}: {admin.rut}, Email: {admin.email}, Tel: {admin.telefono})
                       </li>
                     ))}
                   </ul>
@@ -6765,8 +7053,8 @@ function OnboardingTurnosCliente() {
                             <span>
                               {" ("}
                               {turno.tipoColacion === "libre"
-                                ? `${turno.colacionMinutos} min libre`
-                                : `${turno.colacionInicio} - ${turno.colacionFin} fija`}
+                                ? `${turno.colacionMinutos} min ${esMX ? "de comida libre" : "libre"}`
+                                : `${turno.colacionInicio} - ${turno.colacionFin} ${esMX ? "comida fija" : "fija"}`}
                               {")"}
                             </span>
                           )}
@@ -6887,8 +7175,11 @@ function OnboardingTurnosCliente() {
           eventType: "progress",
           id_zoho: idZoho,
           fechaHoraEnvio: new Date().toISOString(),
+          // País/territorio del onboarding (campo adicional para Zoho).
+          pais: esMX ? "México" : "Chile",
           formData: updatedFormData,
           metadata: {
+            pais: esMX ? "México" : "Chile",
             empresaRut: updatedFormData.empresa.rut || "Sin RUT",
             empresaNombre:
               updatedFormData.empresa.razonSocial || updatedFormData.empresa.nombreFantasia || "Sin nombre",
@@ -6985,8 +7276,11 @@ function OnboardingTurnosCliente() {
           eventType: "progress",
           id_zoho: idZoho,
           fechaHoraEnvio: new Date().toISOString(),
+          // País/territorio del onboarding (campo adicional para Zoho).
+          pais: esMX ? "México" : "Chile",
           formData: updatedFormData,
           metadata: {
+            pais: esMX ? "México" : "Chile",
             empresaRut: updatedFormData.empresa.rut || "Sin RUT",
             empresaNombre:
               updatedFormData.empresa.razonSocial || updatedFormData.empresa.nombreFantasia || "Sin nombre",
@@ -7127,9 +7421,13 @@ function OnboardingTurnosCliente() {
       <Dialog open={showTelefonoCallModal} onOpenChange={setShowTelefonoCallModal}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Teléfono recomendado para Marcaje por Llamada</DialogTitle>
+            <DialogTitle>
+              {esMX ? "Teléfono recomendado para el método Llamada" : "Teléfono recomendado para Marcaje por Llamada"}
+            </DialogTitle>
             <DialogDescription>
-              Seleccionaste Marcaje por Llamada como sistema de marcaje. Por eso recomendamos ingresar el Teléfono 1 de cada trabajador.
+              {esMX
+                ? "Seleccionaste Llamada como método de marcación. Por eso recomendamos ingresar el Teléfono 1 de cada trabajador."
+                : "Seleccionaste Marcaje por Llamada como sistema de marcaje. Por eso recomendamos ingresar el Teléfono 1 de cada trabajador."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm text-slate-700">
@@ -7148,7 +7446,9 @@ function OnboardingTurnosCliente() {
                 onChange={(e) => setTelefonoCallConfirmChecked(e.target.checked)}
               />
               <span>
-                Confirmo que completaré los teléfonos más adelante para habilitar el Marcaje por Llamada.
+                {esMX
+                  ? "Confirmo que completaré los teléfonos más adelante para habilitar la marcación por Llamada."
+                  : "Confirmo que completaré los teléfonos más adelante para habilitar el Marcaje por Llamada."}
               </span>
             </label>
           </div>
