@@ -134,10 +134,17 @@ const isRutFormatValid = (rut) => /^\d{7,8}-[0-9Kk]$/.test(rut.trim())
 const isValidRfc = (id) =>
   /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test((id || "").trim().toUpperCase().replace(/[\s.-]/g, ""))
 const isValidNss = (id) => /^\d{11}$/.test((id || "").trim().replace(/[\s.-]/g, ""))
-// Identificador de EMPRESA: RUT chileno válido o RFC mexicano.
-const isValidTaxId = (id) => (isRutFormatValid(id) && isValidRut(id)) || isValidRfc(id)
-// Identificador de TRABAJADOR: RUT chileno, RFC o NSS mexicano.
-const isValidWorkerId = (id) => (isRutFormatValid(id) && isValidRut(id)) || isValidRfc(id) || isValidNss(id)
+// Colombia (23-jul): NIT de empresa — 8 a 10 dígitos, con dígito de
+// verificación opcional (901234567-7 ó 901234567). Los clientes colombianos
+// del canal digital también llegan a este wizard.
+const isValidNit = (id) => /^\d{8,10}(-?\d)?$/.test((id || "").trim().replace(/[\s.]/g, ""))
+// Cédula colombiana (trabajadores): 6 a 10 dígitos.
+const isValidCedula = (id) => /^\d{6,10}$/.test((id || "").trim().replace(/[\s.-]/g, ""))
+// Identificador de EMPRESA: RUT chileno válido, RFC mexicano o NIT colombiano.
+const isValidTaxId = (id) => (isRutFormatValid(id) && isValidRut(id)) || isValidRfc(id) || isValidNit(id)
+// Identificador de TRABAJADOR: RUT chileno, RFC/NSS mexicano o cédula colombiana.
+const isValidWorkerId = (id) =>
+  (isRutFormatValid(id) && isValidRut(id)) || isValidRfc(id) || isValidNss(id) || isValidCedula(id)
 
 // --- Tropicalización México (22-jul) ---------------------------------------
 // El wizard puede atender onboardings mexicanos (hoja "AutoOnboarding México"
@@ -146,16 +153,20 @@ const isValidWorkerId = (id) => (isRutFormatValid(id) && isValidRut(id)) || isVa
 // 2) Si no, se infiere del identificador tributario prefilado: patrón RFC que
 //    NO es un RUT chileno válido => México.
 // 3) Default: Chile (con esMX=false el wizard se comporta exactamente como hoy).
-const detectarPaisOnboarding = (empresa: any): "cl" | "mx" => {
+const detectarPaisOnboarding = (empresa: any): "cl" | "mx" | "co" => {
   const explicito = String(empresa?.pais || empresa?.territorio || empresa?.country || "")
     .trim()
     .toLowerCase()
   if (explicito) {
     if (explicito === "mx" || explicito === "mex" || explicito.includes("méx") || explicito.includes("mex")) return "mx"
+    if (explicito === "co" || explicito.includes("colomb")) return "co"
     if (explicito === "cl" || explicito.includes("chil")) return "cl"
   }
   const id = String(empresa?.rut || "").trim()
   if (id && isValidRfc(id) && !(isRutFormatValid(id) && isValidRut(id))) return "mx"
+  // NIT colombiano: 9-10 dígitos de cuerpo (un RUT chileno tiene 7-8) — si no
+  // calza como RUT válido, es Colombia.
+  if (id && isValidNit(id) && !(isRutFormatValid(id) && isValidRut(id))) return "co"
   return "cl"
 }
 
@@ -1650,7 +1661,7 @@ const TrabajadoresStep = ({
       } else if (!isValidWorkerId(rutCompleto)) {
         rowErrors.rut = esMX
           ? "Identificador inválido: NSS (11 dígitos) o RFC."
-          : "Identificador inválido: RUT (12345678-9), RFC o NSS."
+          : "Identificador inválido: RUT (12345678-9), RFC, NSS o cédula."
       }
 
       if (!correoPersonal.trim()) {
@@ -2155,7 +2166,7 @@ const TrabajadoresStep = ({
                 else if (!isValidWorkerId(rut))
                   requiredErrors.rut = esMX
                     ? "Identificador inválido: NSS (11 dígitos) o RFC."
-                    : "Identificador inválido: RUT (12345678-9), RFC o NSS."
+                    : "Identificador inválido: RUT (12345678-9), RFC, NSS o cédula."
               
                 if (!correo) requiredErrors.correo = "El correo es obligatorio."
                 else if (!isValidEmail(correo)) requiredErrors.correo = "Formato de correo inv?lido."
@@ -5529,7 +5540,7 @@ function OnboardingTurnosCliente() {
   // token y además se re-deriva del identificador de la empresa (por si el RFC
   // se escribe durante el flujo). Sobrevive la navegación: formData vive en el
   // estado del wizard y en la BD. Con esMX=false todo queda igual que hoy.
-  const [paisSesion, setPaisSesion] = useState<"cl" | "mx">("cl")
+  const [paisSesion, setPaisSesion] = useState<"cl" | "mx" | "co">("cl")
   const esMX = paisSesion === "mx" || detectarPaisOnboarding(formData?.empresa) === "mx"
 
   // Traduce los mensajes de campos faltantes de Empresa al vocabulario MX.
@@ -6254,7 +6265,7 @@ function OnboardingTurnosCliente() {
             if (err.includes("Razón Social")) stepErrors["empresa.razonSocial"] = "Este campo es obligatorio"
             if (err.includes("Nombre de fantasía")) stepErrors["empresa.nombreFantasia"] = "Este campo es obligatorio"
             if (err.includes("RUT (formato invalido)")) {
-              stepErrors["empresa.rut"] = "Formato invalido: RUT (12345678-9) o RFC (ABC123456XY9)"
+              stepErrors["empresa.rut"] = "Formato invalido: RUT (12345678-9), RFC (ABC123456XY9) o NIT (901234567-7)"
             } else if (err.includes("RUT")) {
               stepErrors["empresa.rut"] = "Este campo es obligatorio"
             }
