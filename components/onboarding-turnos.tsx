@@ -415,7 +415,7 @@ const Stepper = ({ currentStep }) => {
   )
 }
 
-const AdminStep = ({ admins, setAdmins, onRemoveAdmin, isEditMode, esMX = false }) => {
+const AdminStep = ({ admins, setAdmins, onRemoveAdmin, isEditMode, esMX = false, esCO = false }) => {
   const [formData, setFormData] = useState({
     nombre: "",
     apellido: "",
@@ -452,11 +452,16 @@ const AdminStep = ({ admins, setAdmins, onRemoveAdmin, isEditMode, esMX = false 
     }
 
     if (!formData.rut.trim()) {
-      errors.rut = esMX ? "El identificador es obligatorio" : "El RUT es obligatorio"
+      errors.rut = esMX ? "El identificador es obligatorio" : esCO ? "La cédula es obligatoria" : "El RUT es obligatorio"
     } else if (esMX) {
       // México: se acepta RFC o NSS (11 dígitos); también RUT por compatibilidad.
       if (!isValidWorkerId(formData.rut)) {
         errors.rut = "Formato inválido: RFC (ABC123456XY9) o NSS (11 dígitos)"
+      }
+    } else if (esCO) {
+      // Colombia: cédula de 6-10 dígitos, solo números.
+      if (!isValidCedula(formData.rut.trim())) {
+        errors.rut = "Formato inválido: cédula de 6 a 10 dígitos, solo números"
       }
     } else {
       // Validar formato de RUT chileno
@@ -588,11 +593,11 @@ const AdminStep = ({ admins, setAdmins, onRemoveAdmin, isEditMode, esMX = false 
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-700">
               <span>
-                {esMX ? "RFC o NSS" : "RUT"} <span className="text-destructive">*</span>
+                {esMX ? "RFC o NSS" : esCO ? "Cédula" : "RUT"} <span className="text-destructive">*</span>
               </span>
               <span
                 className="ml-1 cursor-help text-slate-400"
-                title={esMX ? "Ingresa el RFC o el NSS (11 dígitos)" : "Ingresa el RUT sin puntos y con guión"}
+                title={esMX ? "Ingresa el RFC o el NSS (11 dígitos)" : esCO ? "Ingresa la cédula, solo números" : "Ingresa el RUT sin puntos y con guión"}
               >
                 ⓘ
               </span>
@@ -606,7 +611,7 @@ const AdminStep = ({ admins, setAdmins, onRemoveAdmin, isEditMode, esMX = false 
               type="text"
               value={formData.rut}
               onChange={(e) => handleFormChange("rut", e.target.value)}
-              placeholder={esMX ? "Ej: ABCD123456XY9 o 25349543094" : "Ej: 12345678-9"}
+              placeholder={esMX ? "Ej: ABCD123456XY9 o 25349543094" : esCO ? "Ej: 1234567890" : "Ej: 12345678-9"}
             />
             {fieldErrors.rut && (
               <p className="mt-1 flex items-center gap-1 text-xs text-red-600">
@@ -660,7 +665,7 @@ const AdminStep = ({ admins, setAdmins, onRemoveAdmin, isEditMode, esMX = false 
               type="tel"
               value={formData.telefono}
               onChange={(e) => handleFormChange("telefono", e.target.value)}
-              placeholder={esMX ? "Ej: +5215512345678" : "Ej: +56912345678"}
+              placeholder={esMX ? "Ej: +5215512345678" : esCO ? "Ej: +573001234567" : "Ej: +56912345678"}
             />
             {fieldErrors.telefono && (
               <p className="mt-1 flex items-center gap-1 text-xs text-red-600">
@@ -695,7 +700,7 @@ const AdminStep = ({ admins, setAdmins, onRemoveAdmin, isEditMode, esMX = false 
                     <span className="text-sm font-medium text-slate-900">{admin.nombre}</span>
                   </div>
                   <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                    {admin.rut && <span>{esMX ? "Identificador" : "RUT"}: {admin.rut}</span>}
+                    {admin.rut && <span>{esMX ? "Identificador" : esCO ? "Cédula" : "RUT"}: {admin.rut}</span>}
                     {admin.email && <span>{admin.email}</span>}
                     {admin.telefono && <span>{admin.telefono}</span>}
                   </div>
@@ -790,7 +795,8 @@ const EmpresaStep = React.memo<{
   trackFieldChange: (fieldKey: string, newValue: any) => void
   fieldErrors?: Record<string, string> // Nueva prop
   esMX?: boolean // Tropicalización MX: labels/placeholder según país
-}>(({ empresa, setEmpresa, prefilledFields, isFieldPrefilled, isFieldEdited, trackFieldChange, fieldErrors = {}, esMX = false }) => {
+  esCO?: boolean // Tropicalización CO: NIT/cédula/ciudad
+}>(({ empresa, setEmpresa, prefilledFields, isFieldPrefilled, isFieldEdited, trackFieldChange, fieldErrors = {}, esMX = false, esCO = false }) => {
   const SISTEMAS = ["GeoVictoria BOX", "GeoVictoria CALL", "GeoVictoria APP", "GeoVictoria USB", "GeoVictoria WEB"]
 
   // En MX los métodos se nombran con el vocabulario de la planilla de ingreso
@@ -1127,7 +1133,7 @@ const EmpresaStep = React.memo<{
         />
         <ProtectedInput
           name="nombreFantasia"
-          label={esMX ? "Nombre Comercial" : "Nombre de fantasía"}
+          label={esMX || esCO ? "Nombre Comercial" : "Nombre de fantasía"}
           placeholder="Ej: TechSol"
           value={empresa.nombreFantasia || ""}
           onChange={handleEmpresaChange}
@@ -1135,8 +1141,8 @@ const EmpresaStep = React.memo<{
         />
         <ProtectedInput
           name="rut"
-          label={esMX ? "RFC *" : "RUT *"}
-          placeholder={esMX ? "Ej: ABC123456XY9" : "Ej: 12345678-9"}
+          label={esMX ? "RFC *" : esCO ? "NIT *" : "RUT *"}
+          placeholder={esMX ? "Ej: ABC123456XY9" : esCO ? "Ej: 901914035-6" : "Ej: 12345678-9"}
           value={empresa.rut || ""}
           onChange={handleEmpresaChange}
           error={fieldErrors["empresa.rut"]}
@@ -1159,8 +1165,8 @@ const EmpresaStep = React.memo<{
         />
         <ProtectedInput
           name="comuna"
-          label={esMX ? "Estado *" : "Comuna *"}
-          placeholder={esMX ? "Ej: Ciudad de México" : "Ej: Santiago"}
+          label={esMX ? "Estado *" : esCO ? "Ciudad *" : "Comuna *"}
+          placeholder={esMX ? "Ej: Ciudad de México" : esCO ? "Ej: Bogotá" : "Ej: Santiago"}
           value={empresa.comuna || ""}
           onChange={handleEmpresaChange}
           error={fieldErrors["empresa.comuna"]}
@@ -1178,7 +1184,7 @@ const EmpresaStep = React.memo<{
           name="telefonoContacto"
           label="Teléfono de contacto"
           type="tel"
-          placeholder={esMX ? "Ej: +5215512345678" : "Ej: +56912345678"}
+          placeholder={esMX ? "Ej: +5215512345678" : esCO ? "Ej: +573001234567" : "Ej: +56912345678"}
           value={empresa.telefonoContacto || ""}
           onChange={handleEmpresaChange}
           error={fieldErrors["empresa.telefonoContacto"]}
@@ -1465,6 +1471,7 @@ const TrabajadoresStep = ({
   fieldErrors,
   formData,
   esMX = false, // Tropicalización MX: labels/ayudas con RFC/NSS y teléfonos +52
+  esCO = false, // Tropicalización CO: cédula y teléfonos +57
 }) => {
   const grupoIdCounter = useRef(Date.now())
   const [isFirstMount, setIsFirstMount] = useState(true)
@@ -1479,7 +1486,7 @@ const TrabajadoresStep = ({
   const bulkWorkerCount = bulkWorkers.length
   const handleDownloadTemplate = () => {
     const headers = [
-      esMX ? "Identificador de Usuario / NSS" : "Rut Completo",
+      esMX ? "Identificador de Usuario / NSS" : esCO ? "Cédula" : "Rut Completo",
       "Correo Personal",
       "Nombres",
       "Apellidos",
@@ -1657,7 +1664,7 @@ const TrabajadoresStep = ({
       }
 
       if (!rutCompleto.trim()) {
-        rowErrors.rut = esMX ? "El identificador es obligatorio." : "El RUT es obligatorio."
+        rowErrors.rut = esMX ? "El identificador es obligatorio." : esCO ? "La cédula es obligatoria." : "El RUT es obligatorio."
       } else if (!isValidWorkerId(rutCompleto)) {
         rowErrors.rut = esMX
           ? "Identificador inválido: NSS (11 dígitos) o RFC."
@@ -2126,7 +2133,7 @@ const TrabajadoresStep = ({
             <tr>
               <th className="px-3 py-2 text-left font-medium text-slate-700">Tipo</th>
               <th className="px-3 py-2 text-left font-medium text-slate-700">Nombre</th>
-              <th className="px-3 py-2 text-left font-medium text-slate-700">{esMX ? "Identificador / NSS" : "RUT"}</th>
+              <th className="px-3 py-2 text-left font-medium text-slate-700">{esMX ? "Identificador / NSS" : esCO ? "Cédula" : "RUT"}</th>
               <th className="px-3 py-2 text-left font-medium text-slate-700">Correo</th>
               <th className="px-3 py-2 text-left font-medium text-slate-700">
                 <span className="inline-flex items-center gap-1">
@@ -2162,7 +2169,7 @@ const TrabajadoresStep = ({
                 const correo = t.correo?.trim() || ""
               
                 if (!nombre) requiredErrors.nombre = "El nombre es obligatorio."
-                if (!rut) requiredErrors.rut = esMX ? "El identificador es obligatorio." : "El RUT es obligatorio."
+                if (!rut) requiredErrors.rut = esMX ? "El identificador es obligatorio." : esCO ? "La cédula es obligatoria." : "El RUT es obligatorio."
                 else if (!isValidWorkerId(rut))
                   requiredErrors.rut = esMX
                     ? "Identificador inválido: NSS (11 dígitos) o RFC."
@@ -2221,7 +2228,7 @@ const TrabajadoresStep = ({
                       type="text"
                       value={t.rut}
                       onChange={(e) => updateTrabajador(t.id, "rut", e.target.value)}
-                      placeholder={esMX ? "Ej: 25349543094" : "Ej: 18435922-7"}
+                      placeholder={esMX ? "Ej: 25349543094" : esCO ? "Ej: 1003475457" : "Ej: 18435922-7"}
                       disabled={isAdmin}
                     />
                     {rowErrors.rut && <p className="mt-0.5 text-[10px] text-red-600">{rowErrors.rut}</p>}
@@ -2262,7 +2269,7 @@ const TrabajadoresStep = ({
                       type="tel"
                       value={t.telefono1 || ""}
                       onChange={(e) => updateTrabajador(t.id, "telefono1", e.target.value)}
-                      placeholder={esMX ? "Ej: +5215512345678" : "Ej: +5691234567"}
+                      placeholder={esMX ? "Ej: +5215512345678" : esCO ? "Ej: +573001234567" : "Ej: +5691234567"}
                       disabled={isAdmin}
                     />
                     {telefono1Error && <p className="mt-0.5 text-[10px] text-red-600">{telefono1Error}</p>}
@@ -2275,7 +2282,7 @@ const TrabajadoresStep = ({
                       type="tel"
                       value={t.telefono2 || ""}
                       onChange={(e) => updateTrabajador(t.id, "telefono2", e.target.value)}
-                      placeholder={esMX ? "Ej: +5215512345678" : "Ej: +5691234567"}
+                      placeholder={esMX ? "Ej: +5215512345678" : esCO ? "Ej: +573001234567" : "Ej: +5691234567"}
                       disabled={isAdmin}
                     />
                     {rowErrors.telefono2 && <p className="mt-0.5 text-[10px] text-red-600">{rowErrors.telefono2}</p>}
@@ -2288,7 +2295,7 @@ const TrabajadoresStep = ({
                       type="tel"
                       value={t.telefono3 || ""}
                       onChange={(e) => updateTrabajador(t.id, "telefono3", e.target.value)}
-                      placeholder={esMX ? "Ej: +5215512345678" : "Ej: +5691234567"}
+                      placeholder={esMX ? "Ej: +5215512345678" : esCO ? "Ej: +573001234567" : "Ej: +5691234567"}
                       disabled={isAdmin}
                     />
                     {rowErrors.telefono3 && <p className="mt-0.5 text-[10px] text-red-600">{rowErrors.telefono3}</p>}
@@ -5542,6 +5549,8 @@ function OnboardingTurnosCliente() {
   // estado del wizard y en la BD. Con esMX=false todo queda igual que hoy.
   const [paisSesion, setPaisSesion] = useState<"cl" | "mx" | "co">("cl")
   const esMX = paisSesion === "mx" || detectarPaisOnboarding(formData?.empresa) === "mx"
+  // Tropicalización CO (caso Jessica/JEANSCO 24-jul): mismas etiquetas locales que MX pero para Colombia — NIT/cédula/ciudad.
+  const esCO = !esMX && (paisSesion === "co" || detectarPaisOnboarding(formData?.empresa) === "co")
 
   // Traduce los mensajes de campos faltantes de Empresa al vocabulario MX.
   // Los strings internos (claves de matching en handleNext) no cambian: esto
@@ -6759,6 +6768,7 @@ function OnboardingTurnosCliente() {
               empresa={formData.empresa}
               setEmpresa={setEmpresa}
               esMX={esMX}
+              esCO={esCO}
               prefilledFields={prefilledFields}
               isFieldPrefilled={isFieldPrefilled}
               isFieldEdited={isFieldEdited}
@@ -6805,6 +6815,7 @@ function OnboardingTurnosCliente() {
               onRemoveAdmin={removeAdmin}
               isEditMode={false}
               esMX={esMX}
+              esCO={esCO}
             />
             <NavigationButtons />
           </div>
@@ -6871,6 +6882,7 @@ function OnboardingTurnosCliente() {
                 formData={formData} // Pass formData down
                 ensureGrupoByName={ensureGrupoByName}
                 esMX={esMX}
+              esCO={esCO}
               />
             </StepErrorBoundary>
             <NavigationButtons />
