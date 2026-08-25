@@ -105,8 +105,22 @@ const buildUsuariosWorkbook = (payload: ZohoPayload) => {
     ]
   })
   const adminsRows = (payload.formData?.admins || []).map((admin: any) => {
-    const nombres = admin?.nombre || ""
-    const apellidos = admin?.apellido || ""
+    // FIX apellido duplicado (25-ago, planillas Bersa/Vista Kennedy —
+    // "Cristian lillo lillo"): el form del wizard suele guardar en `nombre`
+    // el nombre COMPLETO y además el apellido por separado; al volcarlos en
+    // columnas distintas, el consumidor los concatena y el apellido queda
+    // dos veces. Si `nombre` termina con `apellido`, se recorta; si no vino
+    // apellido y el nombre trae varias palabras, se separa igual que los
+    // trabajadores.
+    let nombres = String(admin?.nombre || "").trim()
+    let apellidos = String(admin?.apellido || "").trim()
+    if (apellidos && nombres.toLowerCase().endsWith(` ${apellidos.toLowerCase()}`)) {
+      nombres = nombres.slice(0, nombres.length - apellidos.length).trim()
+    } else if (!apellidos && /\s/.test(nombres)) {
+      const partes = splitNombre(nombres)
+      nombres = partes.nombres
+      apellidos = partes.apellidos
+    }
     return [
       normalizeRutForExcel(admin?.rut),
       admin?.email || "",
