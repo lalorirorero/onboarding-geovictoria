@@ -439,6 +439,218 @@ print(f"Token: {data['token']}")
 
 ---
 
+## Función recomendada para Zoho CRM (Deluge) con validación previa
+
+La siguiente función Deluge se puede ejecutar desde un registro del módulo `Autoservicio_Onboarding`. Valida todos los campos obligatorios definidos en este documento antes de llamar a `POST /api/generate-link`. Si falta algún dato, deja una nota en el deal y no hace la llamada, evitando tokens inválidos.
+
+```javascript
+void automation.generar_url_sesion_onboarding_v2(Int id)
+{
+    // =========================
+    // CONFIG
+    // =========================
+    moduleApiName = "Autoservicio_Onboarding";
+    endpoint = "https://v0-v0onboardingturnosmvp2main.vercel.app/api/generate-link";
+
+    // Rubros permitidos (ver sección de rubros)
+    rubrosPermitidos = list(
+        "1. Agrícola","2. Condominio","3. Construcción","4. Inmobiliaria","5. Consultoria",
+        "6. Banca y Finanzas","7. Educación","8. Municipio","9. Gobierno","10. Mineria",
+        "11. Naviera","12. Outsourcing Seguridad","13. Outsourcing General","14. Outsourcing Retail",
+        "15. Planta Productiva","16. Logistica","17. Retail Enterprise","18. Retail SMB",
+        "19. Salud","20. Servicios","21. Transporte","22. Turismo, Hotelería y Gastronomía"
+    );
+
+    // Sistemas de marcaje permitidos
+    sistemasPermitidos = list("GeoVictoria BOX","GeoVictoria CALL","GeoVictoria APP","GeoVictoria USB","GeoVictoria WEB");
+
+    // =========================
+    // 1) OBTENER REGISTRO
+    // =========================
+    rec = zoho.crm.getRecordById(moduleApiName,id);
+    if(rec == null || rec.isEmpty())
+    {
+        info "❌ No se encontró el registro en " + moduleApiName + " con id: " + id;
+        return;
+    }
+
+    // =========================
+    // 2) VALIDAR CAMPOS OBLIGATORIOS
+    // =========================
+    faltantes = list();
+
+    // Helper: agrega label si el campo viene vacío o nulo
+    addIfEmpty = (fieldValue, label) =>
+    {
+        if(fieldValue == null || fieldValue.toString().trim() == "")
+        {
+            faltantes.add(label);
+        }
+    };
+
+    addIfEmpty(rec.get("Raz_n_social"),"Razón Social");
+    addIfEmpty(rec.get("RUT"),"RUT");
+    addIfEmpty(rec.get("Giro"),"Giro");
+    addIfEmpty(rec.get("Direcci_n"),"Dirección");
+    addIfEmpty(rec.get("Comuna"),"Comuna");
+    addIfEmpty(rec.get("Email_Facturaci_n"),"Email de facturación");
+    addIfEmpty(rec.get("Tel_fono_contacto"),"Teléfono de contacto");
+    addIfEmpty(rec.get("Rubro"),"Rubro");
+
+    // Sistemas contratados (multiselect)
+    sistemasCrm = rec.get("Sistemas_contratados");
+    sistemasList = list();
+    if(sistemasCrm != null)
+    {
+        for each  s in sistemasCrm
+        {
+            sistemasList.add(s);
+        }
+    }
+    if(sistemasList.isEmpty())
+    {
+        faltantes.add("Sistema de marcaje (al menos uno)");
+    }
+
+    // Validar rubro contra lista permitida
+    rubroValue = ifnull(rec.get("Rubro"),"").trim();
+    if(rubroValue != "" && !rubrosPermitidos.contains(rubroValue))
+    {
+        faltantes.add("Rubro no válido según catálogo");
+    }
+
+    // Validar sistemas contra catálogo
+    sistemasInvalidos = list();
+    for each  s in sistemasList
+    {
+        if(!sistemasPermitidos.contains(s))
+        {
+            sistemasInvalidos.add(s);
+        }
+    }
+    if(!sistemasInvalidos.isEmpty())
+    {
+        faltantes.add("Sistema(s) no reconocido(s): " + sistemasInvalidos.toString("; "));
+    }
+
+    if(!faltantes.isEmpty())
+    {
+        // Dejar nota en el registro y salir
+        noteContent = "No se generó el link de onboarding. Faltan/son inválidos: " + faltantes.toString(", ");
+        noteMap = map();
+        noteMap.put("Note_Title","Onboarding: datos incompletos");
+        noteMap.put("Note_Content",noteContent);
+        noteResp = zoho.crm.addNote(moduleApiName,id,noteMap);
+        info "⚠️ Datos incompletos. Se agregó nota al registro.";
+        info noteResp;
+        return;
+    }
+
+    // =========================
+    // 3) ARMAR BODY PARA API
+    // =========================
+    empresaMap = map();
+    empresaMap.put("razonSocial",ifnull(rec.get("Raz_n_social"),""));
+    empresaMap.put("nombreFantasia",ifnull(rec.get("Nombre_de_fantas_a"),""));
+    empresaMap.put("rut",ifnull(rec.get("RUT"),""));
+    empresaMap.put("giro",ifnull(rec.get("Giro"),""));
+    empresaMap.put("direccion",ifnull(rec.get("Direcci_n"),""));
+    empresaMap.put("comuna",ifnull(rec.get("Comuna"),""));
+    empresaMap.put("emailFacturacion",ifnull(rec.get("Email_Facturaci_n"),""));
+    empresaMap.put("telefonoContacto",ifnull(rec.get("Tel_fono_contacto"),""));
+    empresaMap.put("rubro",rubroValue);
+    empresaMap.put("sistema",sistemasList);
+
+    bodyMap = map();
+    bodyMap.put("id_zoho",id.toString());
+    bodyMap.put("empresa",empresaMap);
+
+    headersMap = map();
+    headersMap.put("Content-Type","application/json");
+
+    // =========================
+    // 4) INVOKEURL (POST)
+    // =========================
+    response = invokeurl
+    [
+        url :endpoint
+        type :POST
+        parameters:bodyMap.toString()
+        headers:headersMap
+    ];
+
+    // =========================
+    // 5) PARSE RESPUESTA
+    // =========================
+    respMap = map();
+    try 
+    {
+        respMap = response.toMap();
+    }
+    catch (e)
+    {
+        info "❌ No pude convertir la respuesta a Map. Respuesta cruda:";
+        info response;
+        return;
+    }
+
+    if(respMap.get("success") != true)
+    {
+        info "❌ La API respondió success=false o no viene success.";
+        info respMap;
+        return;
+    }
+
+    link = ifnull(respMap.get("link"),"");
+    token = ifnull(respMap.get("token"),"");
+    if(link == "" || token == "")
+    {
+        info "❌ Respuesta sin link o token.";
+        info respMap;
+        return;
+    }
+
+    // =========================
+    // 6) ACTUALIZAR REGISTRO
+    // =========================
+    updateMap = map();
+    updateMap.put("URL_de_Onboarding",link);
+    updateMap.put("Token_p_blico",token);
+    updateMap.put("Token_Activo",true);
+
+    fechaChileISO = zoho.currenttime.toString("yyyy-MM-dd'T'HH:mm:ss") + "-03:00";
+    updateMap.put("Fecha_generaci_n_token",fechaChileISO);
+
+    updateResp = zoho.crm.updateRecord(moduleApiName,id,updateMap);
+
+    // =========================
+    // 7) NOTA OPCIONAL DE ÉXITO
+    // =========================
+    if(updateResp.get("code") == "SUCCESS")
+    {
+        noteMap = map();
+        noteMap.put("Note_Title","Onboarding: token generado");
+        noteMap.put("Note_Content","Se generó el link de onboarding y se actualizó el registro. Link: " + link);
+        zoho.crm.addNote(moduleApiName,id,noteMap);
+        info "✅ URL de onboarding generada y guardada correctamente";
+    }
+    else
+    {
+        info "❌ Error al actualizar el registro:";
+        info updateResp;
+    }
+}
+```
+
+**Qué hace y por qué es más seguro**
+
+- Verifica presencia de todos los campos obligatorios del payload (razón social, RUT, giro, dirección, comuna, email de facturación, teléfono de contacto, rubro y al menos un sistema de marcaje).
+- Valida rubro y sistemas contra los catálogos oficiales para evitar valores inválidos.
+- Deja una nota en el registro cuando faltan datos o hay valores no permitidos, en lugar de disparar una API que fallaría.
+- Marca fecha de generación del token y actualiza los campos de URL, token y flag de activo cuando la llamada es exitosa.
+
+---
+
 ## Notas Importantes
 
 1. **Formato de RUT**: Debe incluir puntos y guión. Ejemplo: `76.543.210-5`
